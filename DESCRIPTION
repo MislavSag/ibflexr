@@ -1,0 +1,20 @@
+Package: ibflexr
+Type: Package
+Title: Managae flex reports and prepaare data for quant analysis
+Version: 0.1.0
+Author: Mislav Sagovac
+Maintainer: Mislav Sagovac  <mislav.sagovac@contentio.biz>
+Description: Dowbnload flex reports from Interactive Brokers and prepare data for quant analysis.
+License: MIT + file LICENSE
+Imports:
+    R6,
+    data.table,
+    checkmate,
+    httr,
+    rvest,
+    xml2,
+    yahoofinancer,
+    PMwR
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.3.1
