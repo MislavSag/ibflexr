@@ -155,16 +155,24 @@ Strategy = R6::R6Class(
     }
   ),
   private = list(
-    filter_date = function(dt, date) {
-      if (date %in% colnames(dt)) {
-        dt = dt[get(date) >= self$start_date]
+    filter_date = function(dt, date_) {
+      # dt = copy(xml_extracted)
+      # date = "reportDate"
+      if (date_ %in% colnames(dt)) {
+        dt = dt[get(date_) >= self$start_date]
       }
       return(dt)
     }
   )
 )
 
-
+# library(R6)
+# library(httr)
+# library(rvest)
+# library(xml2)
+# library(data.table)
+# library(PMwR)
+# library(yahoofinancer)
 # FLEX_PRA = c(
 #   "https://snpmarketdata.blob.core.windows.net/flex/pra_2023.xml"
 # )
@@ -179,17 +187,8 @@ Strategy = R6::R6Class(
 # report = flex$get_flex_report()
 # flex_reports_xml = list(flex_report_2022, flex_report_2023, report)
 #
-# strategy = Strategy$new(flex_reports_xml)
+# strategy = Strategy$new(flex_reports_xml, start_date = as.Date("2024-01-01"))
 # self = strategy$clone()
-
-# trades = strategy$extract_node("Trade")
-# trades = strategy$summary_cfd_trades()
-# equity_summary_in_base = strategy$extract_node("EquitySummaryByReportDateInBase")
-# equity_summary_in_base[, .(timestamp = reportDate,
-#                            NAV = as.numeric(total))]
-# transfers = strategy$extract_node("Transfer")
-#
-# nav_units = strategy$calculate_nav_units(benchmark_symbol = "SPY")
 
 # find node
 # x = as_list(flex_reports_xml[[1]])
