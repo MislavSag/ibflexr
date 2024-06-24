@@ -9,6 +9,7 @@
 #' @param flex_reports_xml list of XML flex reports.
 #'
 #' @return A Strategy object
+#' @export
 Strategy = R6::R6Class(
   "Strategy",
 
@@ -17,18 +18,23 @@ Strategy = R6::R6Class(
     #' @field flex_reports_xml list of XML flex reports
     flex_reports_xml = NULL,
 
+    #' @field start_date The start date of the strategy
+    start_date = NULL,
+
     #' @description
     #' Initialize the Strategy object
     #'
     #' @param flex_reports_xml list of XML flex reports
+    #' @param start_date The start date of the strategy
     #'
     #' @return The Strategy object
-    initialize = function(flex_reports_xml) {
+    initialize = function(flex_reports_xml, start_date = NULL) {
       # DEBUG
       # self = list()
       # self$flex_reports_xml = flex_reports_xml
 
       self$flex_reports_xml = flex_reports_xml
+      self$start_date = start_date
     },
 
     #' @description
@@ -40,7 +46,7 @@ Strategy = R6::R6Class(
     #'
     #' @return The extracted node in data.table format
     extract_node = function(node) {
-      # node = "Trade"
+      # node = "CFDCharge"
       # Extract node
       xml_l = lapply(self$flex_reports_xml, function(x) {
         # x = self$flex_reports_xml[[1]]
@@ -65,10 +71,17 @@ Strategy = R6::R6Class(
 
       # Cleaning
       xml_extracted = xml_extracted[, .SD, .SDcols = !colSums(is.na(xml_extracted)) == nrow(xml_extracted)]
-      xml_extracted = xml_extracted[, .SD, .SDcols = colSums(xml_extracted != 0) > 0]
+      xml_extracted = xml_extracted[, .SD, .SDcols = colSums(xml_extracted != 0, na.rm = TRUE) > 0]
 
       # Keep only unique rows
       xml_extracted = unique(xml_extracted)
+
+      # Filter date after start_date for column tradeDate if tradeDate column exist in data.table
+      if (!is.null(self$start_date)) {
+        for (date in date_columns) {
+          xml_extracted = private$filter_date(xml_extracted, date)
+        }
+      }
 
       return(xml_extracted)
     },
@@ -99,7 +112,7 @@ Strategy = R6::R6Class(
       setnames(transfers, c("timestamp", "NAV"))
 
       # Get NAV values
-      equity_curve = strategy$extract_node("EquitySummaryByReportDateInBase")
+      equity_curve = self$extract_node("EquitySummaryByReportDateInBase")
       equity_curve = equity_curve[, .(timestamp = reportDate, NAV = total)]
       equity_curve = equity_curve[NAV > 0]
       setorder(equity_curve, "timestamp")
@@ -129,7 +142,7 @@ Strategy = R6::R6Class(
         setDT(benchmark)
         benchmark[, date := as.Date(date)]
         benchmark[, adj_close := as.numeric(adj_close)]
-        benchmark[, close_unit := adj_close / shift(adj_close) - 1]
+        benchmark[, close_unit := adj_close / first(adj_close) * 100]
         nav_units = benchmark[nav_units, on = c("date" = "timestamp")]
       }
 
@@ -140,31 +153,35 @@ Strategy = R6::R6Class(
 
       return(nav_units[, .(date, Strategy, Benchmark)])
     }
+  ),
+  private = list(
+    filter_date = function(dt, date) {
+      if (date %in% colnames(dt)) {
+        dt = dt[get(date) >= self$start_date]
+      }
+      return(dt)
+    }
   )
 )
 
-# DEBUG
-# SNP_TOKEN = '114675794008076852662086' # '112391365954681463992598'
-# CGS_TOKEN = '357033856026608409139901'
-# CGS_ED_TOKEN = '66472513822268724154000'
-# CGS_TOKEN_PRA = '22092566548262639113984' # "201490993548010999912988"
-# CGS_TOKEN_EXUBER_INVERSE = "661783759275938846524009"
-#
-# flex = Flex$new(token ='22092566548262639113984', query = '803831')
-# p = flex$send()
-# g = flex$get(newtoken = p)
-# report = flex$get_flex_report()
-#
+
 # FLEX_PRA = c(
 #   "https://snpmarketdata.blob.core.windows.net/flex/pra_2023.xml"
 # )
-# flex_report_2023 = read_xml(FLEX_PRA)
+# FLEX_MINMAX = c(
+#   "https://snpmarketdata.blob.core.windows.net/flex/minmax_2022.xml",
+#   "https://snpmarketdata.blob.core.windows.net/flex/minmax_2023.xml",
+#   "https://snpmarketdata.blob.core.windows.net/flex/minmax.xml"
+# )
+# flex_report_2022 = read_xml(FLEX_MINMAX[1])
+# flex_report_2023 = read_xml(FLEX_MINMAX[2])
 # flex = Flex$new(token ='22092566548262639113984', query = '803831')
 # report = flex$get_flex_report()
-# flex_reports_xml = list(flex_report_2023, report)
+# flex_reports_xml = list(flex_report_2022, flex_report_2023, report)
 #
 # strategy = Strategy$new(flex_reports_xml)
 # self = strategy$clone()
+
 # trades = strategy$extract_node("Trade")
 # trades = strategy$summary_cfd_trades()
 # equity_summary_in_base = strategy$extract_node("EquitySummaryByReportDateInBase")
@@ -173,4 +190,11 @@ Strategy = R6::R6Class(
 # transfers = strategy$extract_node("Transfer")
 #
 # nav_units = strategy$calculate_nav_units(benchmark_symbol = "SPY")
-#
+
+# find node
+# x = as_list(flex_reports_xml[[1]])
+# x = x$FlexQueryResponse$FlexStatements$FlexStatement
+# x = x[sapply(x, function(y) !all(y == "\n"))]
+# names(x)
+# x$EquitySummaryInBase$EquitySummaryByReportDateInBase
+# strategy$extract_node("EquitySummaryInBase")

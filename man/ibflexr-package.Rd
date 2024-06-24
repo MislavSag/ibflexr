@@ -4,7 +4,7 @@
 \name{ibflexr-package}
 \alias{ibflexr}
 \alias{ibflexr-package}
-\title{ibflexr: Managae flex reports and prepaare data for quant analysis.}
+\title{ibflexr: Managae flex reports and prepaare data for quant analysis}
 \description{
 Dowbnload flex reports from Interactive Brokers and prepare data for quant analysis.
 }

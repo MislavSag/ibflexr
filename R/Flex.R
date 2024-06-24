@@ -10,6 +10,7 @@
 #' @param query The query to be used for the IB Flex API
 #'
 #' @return A Flex object
+#' @export
 Flex = R6::R6Class(
   "Flex",
 
