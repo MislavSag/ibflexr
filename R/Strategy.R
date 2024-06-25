@@ -107,7 +107,8 @@ Strategy = R6::R6Class(
     #'
     #' @return The NAV units
     calculate_nav_units = function(benchmark_symbol = NULL,
-                                   start_date = self$start_date) {
+                                   start_date = self$start_date,
+                                   unit = NULL) {
       # Get transfers
       transfers = self$extract_node("Transfer", FALSE)
       transfers = transfers[, .(date, cashTransfer)]
@@ -144,6 +145,11 @@ Strategy = R6::R6Class(
         nav_units = as.data.table(nav_units)
       }
 
+      # Scale if unit is provided
+      if (!is.null(unit)) {
+        private$calculate_unleveraged_NAV(nav_units)
+      }
+
       # Add benchmark
       if (!is.null(benchmark_symbol)) {
         # benchmark_symbol = "SPY"
@@ -154,8 +160,8 @@ Strategy = R6::R6Class(
         setDT(benchmark)
         benchmark[, date := as.Date(date)]
         benchmark[, adj_close := as.numeric(adj_close)]
-        benchmark[, close_unit := adj_close / first(adj_close) * 100]
         nav_units = benchmark[nav_units, on = c("date" = "timestamp")]
+        nav_units[, close_unit := adj_close / first(adj_close) * 100]
       }
 
       # Set names as Strategy and Benchmark
@@ -174,6 +180,25 @@ Strategy = R6::R6Class(
       if (date_ %in% colnames(dt)) {
         dt = dt[get(date_) >= self$start_date]
       }
+      return(dt)
+    },
+    calculate_unleveraged_NAV = function(dt, unit = 2) {
+      # Calculate daily returns from NAV values
+      dt[, daily_return := c(NA, diff(price) / head(price, -1))]
+
+      # Adjust the returns to reflect what they would be without leverage
+      dt[, unleveraged_return := daily_return / unit]
+
+      # Initial NAV value
+      initial_NAV = dt$price[1]
+
+      # Reconstruct the unleveraged NAV series
+      dt[, price := initial_NAV * cumprod(1 + ifelse(is.na(unleveraged_return), 0, unleveraged_return))]
+
+      # Remove unnecessary columns
+      dt[, c("daily_return", "unleveraged_return") := NULL]
+
+      # Return the modified data.table
       return(dt)
     }
   )
@@ -204,7 +229,7 @@ Strategy = R6::R6Class(
 #
 # strategy = Strategy$new(flex_reports_xml, start_date = as.Date("2024-01-01"))
 # self = strategy$clone()
-#
+
 # strategy = Strategy$new(flex_reports_xml, start_date = as.Date("2023-05-01"))
 # self = strategy$clone()
 
