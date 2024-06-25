@@ -60,15 +60,15 @@ The Strategy object
 Extract node from the XML report. The function clean data so that it can
 be easly used for further analysis.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Strategy$extract_node(node)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{Strategy$extract_node(node, filter_date = TRUE)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{node}}{The node to be extracted.}
+\item{\code{node}}{The node to be extracted}
 
-\item{\code{xml_reports}}{list of XML flex reports.}
+\item{\code{filter_date}}{Filter date after start_date for column tradeDate if tradeDate column exist in data.table}
 }
 \if{html}{\out{</div>}}
 }
@@ -95,13 +95,18 @@ The summarized CFD trades
 \subsection{Method \code{calculate_nav_units()}}{
 Calculate NAV units
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Strategy$calculate_nav_units(benchmark_symbol = NULL)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{Strategy$calculate_nav_units(
+  benchmark_symbol = NULL,
+  start_date = self$start_date
+)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
 \item{\code{benchmark_symbol}}{The benchmark symbol}
+
+\item{\code{start_date}}{The start date}
 }
 \if{html}{\out{</div>}}
 }

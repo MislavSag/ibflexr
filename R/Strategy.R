@@ -41,11 +41,11 @@ Strategy = R6::R6Class(
     #' Extract node from the XML report. The function clean data so that it can
     #' be easly used for further analysis.
     #'
-    #' @param xml_reports list of XML flex reports.
-    #' @param node The node to be extracted.
+    #' @param node The node to be extracted
+    #' @param filter_date Filter date after start_date for column tradeDate if tradeDate column exist in data.table
     #'
     #' @return The extracted node in data.table format
-    extract_node = function(node) {
+    extract_node = function(node, filter_date = TRUE) {
       # node = "CFDCharge"
       # Extract node
       xml_l = lapply(self$flex_reports_xml, function(x) {
@@ -77,7 +77,7 @@ Strategy = R6::R6Class(
       xml_extracted = unique(xml_extracted)
 
       # Filter date after start_date for column tradeDate if tradeDate column exist in data.table
-      if (!is.null(self$start_date)) {
+      if (!is.null(self$start_date) && filter_date == TRUE) {
         for (date in date_columns) {
           xml_extracted = private$filter_date(xml_extracted, date)
         }
@@ -103,16 +103,18 @@ Strategy = R6::R6Class(
     #' Calculate NAV units
     #'
     #' @param benchmark_symbol The benchmark symbol
+    #' @param start_date The start date
     #'
     #' @return The NAV units
-    calculate_nav_units = function(benchmark_symbol = NULL) {
+    calculate_nav_units = function(benchmark_symbol = NULL,
+                                   start_date = self$start_date) {
       # Get transfers
-      transfers = self$extract_node("Transfer")
+      transfers = self$extract_node("Transfer", FALSE)
       transfers = transfers[, .(date, cashTransfer)]
       setnames(transfers, c("timestamp", "NAV"))
 
       # Get NAV values
-      equity_curve = self$extract_node("EquitySummaryByReportDateInBase")
+      equity_curve = self$extract_node("EquitySummaryByReportDateInBase", FALSE)
       equity_curve = equity_curve[, .(timestamp = reportDate, NAV = total)]
       equity_curve = equity_curve[NAV > 0]
       setorder(equity_curve, "timestamp")
@@ -124,13 +126,23 @@ Strategy = R6::R6Class(
                      NAV := NAV + transfers[3:nrow(transfers), NAV]]
       }
 
-      # calculate NAV units using PMwr package
-      nav_units = unit_prices(
-        as.data.frame(equity_curve),
-        cashflow = as.data.frame(transfers),
-        initial.price = 100
-      )
-      setDT(nav_units)
+      # Filter by dates
+      dt_ = equity_curve[timestamp > start_date]
+      if (transfers[, max(timestamp)] < start_date) {
+        nav_units = scale1(as.xts.data.table(dt_), level = 100)
+        nav_units = as.data.table(xts::as.xts(nav_units))
+        setnames(nav_units, c("timestamp", "price"))
+      } else {
+        cf = copy(transfers)
+        cf[timestamp < start_date, timestamp := dt_[, min(timestamp)]]
+        cf = cf[, .(NAV = sum(NAV)), by = timestamp]
+        nav_units = unit_prices(
+          as.data.frame(dt_),
+          cashflow = as.data.frame(cf),
+          initial.price = 100
+        )
+        nav_units = as.data.table(nav_units)
+      }
 
       # Add benchmark
       if (!is.null(benchmark_symbol)) {
@@ -151,6 +163,7 @@ Strategy = R6::R6Class(
                c("close_unit", "price"),
                c("Benchmark", "Strategy"))
 
+      # plot(as.xts.data.table(nav_units[, .(date, Strategy, Benchmark)]))
       return(nav_units[, .(date, Strategy, Benchmark)])
     }
   ),
@@ -174,21 +187,27 @@ Strategy = R6::R6Class(
 # library(PMwR)
 # library(yahoofinancer)
 # FLEX_PRA = c(
-#   "https://snpmarketdata.blob.core.windows.net/flex/pra_2023.xml"
+#   "https://snpmarketdata.blob.core.windows.net/flex/pra_2023.xml",
+#   "https://snpmarketdata.blob.core.windows.net/flex/pra.xml"
 # )
 # FLEX_MINMAX = c(
 #   "https://snpmarketdata.blob.core.windows.net/flex/minmax_2022.xml",
 #   "https://snpmarketdata.blob.core.windows.net/flex/minmax_2023.xml",
 #   "https://snpmarketdata.blob.core.windows.net/flex/minmax.xml"
 # )
-# flex_report_2022 = read_xml(FLEX_MINMAX[1])
-# flex_report_2023 = read_xml(FLEX_MINMAX[2])
+# flex_report_2022 = read_xml(FLEX_PRA[1])
+# flex_report_2023 = read_xml(FLEX_PRA[2])
 # flex = Flex$new(token ='22092566548262639113984', query = '803831')
 # report = flex$get_flex_report()
 # flex_reports_xml = list(flex_report_2022, flex_report_2023, report)
+# flex_reports_xml = list(flex_report_2022, flex_report_2023)
 #
 # strategy = Strategy$new(flex_reports_xml, start_date = as.Date("2024-01-01"))
 # self = strategy$clone()
+#
+# strategy = Strategy$new(flex_reports_xml, start_date = as.Date("2023-05-01"))
+# self = strategy$clone()
+
 
 # find node
 # x = as_list(flex_reports_xml[[1]])
@@ -197,3 +216,11 @@ Strategy = R6::R6Class(
 # names(x)
 # x$EquitySummaryInBase$EquitySummaryByReportDateInBase
 # strategy$extract_node("EquitySummaryInBase")
+# strategy_pra = Strategy$new(lapply(FLEX_PRA, read_xml, "2023-04-25"))
+#
+# > exuber_start
+# [1] "2024-05-01"
+# > minmax_start
+# [1] "2023-02-10"
+# > pra_start
+# [1] "2023-04-25"
