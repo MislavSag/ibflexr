@@ -46,7 +46,7 @@ Strategy = R6::R6Class(
     #'
     #' @return The extracted node in data.table format
     extract_node = function(node, filter_date = TRUE) {
-      # node = "CFDCharge"
+      # node = "CashReportCurrency"
       # Extract node
       xml_l = lapply(self$flex_reports_xml, function(x) {
         # x = self$flex_reports_xml[[1]]
@@ -104,6 +104,7 @@ Strategy = R6::R6Class(
     #'
     #' @param benchmark_symbol The benchmark symbol
     #' @param start_date The start date
+    #' @param unit The unit
     #'
     #' @return The NAV units
     calculate_nav_units = function(benchmark_symbol = NULL,
@@ -127,27 +128,24 @@ Strategy = R6::R6Class(
                      NAV := NAV + transfers[3:nrow(transfers), NAV]]
       }
 
+      # Remove CFD costs and / or interests
+      cfd_charges = self$extract_node("CFDCharge", FALSE)
+      interests = self$extract_node("TierInterestDetail", FALSE)
+      equity_curve_gross = cfd_charges[equity_curve, on = c("date" = "timestamp")]
+      equity_curve_gross = interests[equity_curve_gross, on = c("valueDate" = "date")]
+      equity_curve_gross[, cum_cfd_cost := cumsum(nafill(total, fill = 0))]
+      equity_curve_gross[, cum_interests := cumsum(nafill(totalInterest, fill = 0))]
+      equity_curve_gross[, NAV := NAV - cum_cfd_cost - cum_interests]
+      equity_curve_gross = equity_curve_gross[, .(timestamp = valueDate, NAV)]
+
       # Filter by dates
-      dt_ = equity_curve[timestamp > start_date]
-      if (transfers[, max(timestamp)] < start_date) {
-        nav_units = scale1(as.xts.data.table(dt_), level = 100)
-        nav_units = as.data.table(xts::as.xts(nav_units))
-        setnames(nav_units, c("timestamp", "price"))
-      } else {
-        cf = copy(transfers)
-        cf[timestamp < start_date, timestamp := dt_[, min(timestamp)]]
-        cf = cf[, .(NAV = sum(NAV)), by = timestamp]
-        nav_units = unit_prices(
-          as.data.frame(dt_),
-          cashflow = as.data.frame(cf),
-          initial.price = 100
-        )
-        nav_units = as.data.table(nav_units)
-      }
+      nav_units = private$get_unit_prices(equity_curve, transfers, start_date = start_date)
+      nav_units_gross = private$get_unit_prices(equity_curve_gross, transfers, start_date = start_date)
 
       # Scale if unit is provided
       if (!is.null(unit)) {
-        private$calculate_unleveraged_NAV(nav_units)
+        private$calculate_unleveraged_NAV(nav_units, unit)
+        private$calculate_unleveraged_NAV(nav_units_gross, unit)
       }
 
       # Add benchmark
@@ -165,12 +163,13 @@ Strategy = R6::R6Class(
       }
 
       # Set names as Strategy and Benchmark
-      setnames(nav_units,
-               c("close_unit", "price"),
-               c("Benchmark", "Strategy"))
+      nav_units_merged = merge(nav_units[, .(date, Strategy = price, Benchmark = close_unit)],
+                               nav_units_gross[, .(date = timestamp, StrategyGross = price)],
+                               by = "date", all = TRUE)
+      nav_units_merged = unique(nav_units_merged)
 
       # plot(as.xts.data.table(nav_units[, .(date, Strategy, Benchmark)]))
-      return(nav_units[, .(date, Strategy, Benchmark)])
+      return(nav_units_merged)
     }
   ),
   private = list(
@@ -200,6 +199,24 @@ Strategy = R6::R6Class(
 
       # Return the modified data.table
       return(dt)
+    },
+    get_unit_prices = function(equity_curve, transfers, start_date) {
+      dt_ = equity_curve[timestamp > start_date]
+      if (transfers[, max(timestamp)] < start_date) {
+        nav_units = scale1(as.xts.data.table(dt_), level = 100)
+        nav_units = as.data.table(xts::as.xts(nav_units))
+        setnames(nav_units, c("timestamp", "price"))
+      } else {
+        cf = copy(transfers)
+        cf[timestamp < start_date, timestamp := dt_[, min(timestamp)]]
+        cf = cf[, .(NAV = sum(NAV)), by = timestamp]
+        nav_units = unit_prices(
+          as.data.frame(dt_),
+          cashflow = as.data.frame(cf),
+          initial.price = 100
+        )
+        nav_units = as.data.table(nav_units)
+      }
     }
   )
 )
@@ -220,8 +237,12 @@ Strategy = R6::R6Class(
 #   "https://snpmarketdata.blob.core.windows.net/flex/minmax_2023.xml",
 #   "https://snpmarketdata.blob.core.windows.net/flex/minmax.xml"
 # )
-# flex_report_2022 = read_xml(FLEX_PRA[1])
-# flex_report_2023 = read_xml(FLEX_PRA[2])
+# FLEX_EXUBER = c(
+#   "https://snpmarketdata.blob.core.windows.net/flex/exuberbondsml_2023.xml",
+#   "https://snpmarketdata.blob.core.windows.net/flex/exuberv1.xml"
+# )
+# flex_report_2022 = read_xml(FLEX_EXUBER[1])
+# flex_report_2023 = read_xml(FLEX_EXUBER[2])
 # flex = Flex$new(token ='22092566548262639113984', query = '803831')
 # report = flex$get_flex_report()
 # flex_reports_xml = list(flex_report_2022, flex_report_2023, report)
@@ -232,15 +253,16 @@ Strategy = R6::R6Class(
 
 # strategy = Strategy$new(flex_reports_xml, start_date = as.Date("2023-05-01"))
 # self = strategy$clone()
-
-
+#
+# strategy$calculate_nav_units("SPY", unit = NULL)
+#
 # find node
 # x = as_list(flex_reports_xml[[1]])
 # x = x$FlexQueryResponse$FlexStatements$FlexStatement
 # x = x[sapply(x, function(y) !all(y == "\n"))]
 # names(x)
-# x$EquitySummaryInBase$EquitySummaryByReportDateInBase
-# strategy$extract_node("EquitySummaryInBase")
+# x$TierInterestDetails$TierInterestDetail
+# strategy$extract_node("TierInterestDetail")
 # strategy_pra = Strategy$new(lapply(FLEX_PRA, read_xml, "2023-04-25"))
 #
 # > exuber_start

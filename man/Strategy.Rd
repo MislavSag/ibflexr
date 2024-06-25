@@ -97,7 +97,8 @@ Calculate NAV units
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{Strategy$calculate_nav_units(
   benchmark_symbol = NULL,
-  start_date = self$start_date
+  start_date = self$start_date,
+  unit = NULL
 )}\if{html}{\out{</div>}}
 }
 
@@ -107,6 +108,8 @@ Calculate NAV units
 \item{\code{benchmark_symbol}}{The benchmark symbol}
 
 \item{\code{start_date}}{The start date}
+
+\item{\code{unit}}{The unit}
 }
 \if{html}{\out{</div>}}
 }
