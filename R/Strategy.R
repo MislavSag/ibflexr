@@ -130,13 +130,8 @@ Strategy = R6::R6Class(
 
       # Remove CFD costs and / or interests
       cfd_charges = self$extract_node("CFDCharge", FALSE)
-
-      cfd_charges[duplicated(date)]
-      interests[duplicated(valueDate) | duplicated(valueDate, fromLast = TRUE)]
-
       interests = self$extract_node("TierInterestDetail", FALSE)
-      interests = interests[, .(valueDate, totalInterest)]
-
+      interests = interests[, .(totalInterest = sum(totalInterest, na.rm = TRUE)), by = valueDate]
       equity_curve_gross = cfd_charges[equity_curve, on = c("date" = "timestamp")]
       equity_curve_gross = interests[equity_curve_gross, on = c("valueDate" = "date")]
       equity_curve_gross[, cum_cfd_cost := cumsum(nafill(total, fill = 0))]
@@ -255,7 +250,7 @@ Strategy = R6::R6Class(
 # )
 # flex_report_2022 = read_xml(FLEX_PRA[1])
 # flex_report_2023 = read_xml(FLEX_PRA[2])
-# report = read_xml(FLEX_PRA[2])
+# report = read_xml(FLEX_PRA[3])
 # flex = Flex$new(token ='22092566548262639113984', query = '803831')
 # report = flex$get_flex_report()
 # flex_reports_xml = list(flex_report_2022, flex_report_2023, report)
