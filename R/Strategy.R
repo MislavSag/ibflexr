@@ -130,13 +130,24 @@ Strategy = R6::R6Class(
 
       # Remove CFD costs and / or interests
       cfd_charges = self$extract_node("CFDCharge", FALSE)
+
+      cfd_charges[duplicated(date)]
+      interests[duplicated(valueDate) | duplicated(valueDate, fromLast = TRUE)]
+
       interests = self$extract_node("TierInterestDetail", FALSE)
+      interests = interests[, .(valueDate, totalInterest)]
+
       equity_curve_gross = cfd_charges[equity_curve, on = c("date" = "timestamp")]
       equity_curve_gross = interests[equity_curve_gross, on = c("valueDate" = "date")]
       equity_curve_gross[, cum_cfd_cost := cumsum(nafill(total, fill = 0))]
       equity_curve_gross[, cum_interests := cumsum(nafill(totalInterest, fill = 0))]
       equity_curve_gross[, NAV := NAV - cum_cfd_cost - cum_interests]
       equity_curve_gross = equity_curve_gross[, .(timestamp = valueDate, NAV)]
+
+      # Set start_date if it is not provided
+      if (is.null(start_date)) {
+        start_date = equity_curve[, min(timestamp)]
+      }
 
       # Filter by dates
       nav_units = private$get_unit_prices(equity_curve, transfers, start_date = start_date)
@@ -166,7 +177,8 @@ Strategy = R6::R6Class(
       nav_units_merged = merge(nav_units[, .(date, Strategy = price, Benchmark = close_unit)],
                                nav_units_gross[, .(date = timestamp, StrategyGross = price)],
                                by = "date", all = TRUE)
-      nav_units_merged = unique(nav_units_merged)
+      nav_units_merged = na.omit(nav_units_merged, cols = c("Strategy", "Benchmark"))
+      nav_units_merged = unique(nav_units_merged, by = c("date", "Strategy", "Benchmark"))
 
       # plot(as.xts.data.table(nav_units[, .(date, Strategy, Benchmark)]))
       return(nav_units_merged)
@@ -241,8 +253,9 @@ Strategy = R6::R6Class(
 #   "https://snpmarketdata.blob.core.windows.net/flex/exuberbondsml_2023.xml",
 #   "https://snpmarketdata.blob.core.windows.net/flex/exuberv1.xml"
 # )
-# flex_report_2022 = read_xml(FLEX_EXUBER[1])
-# flex_report_2023 = read_xml(FLEX_EXUBER[2])
+# flex_report_2022 = read_xml(FLEX_PRA[1])
+# flex_report_2023 = read_xml(FLEX_PRA[2])
+# report = read_xml(FLEX_PRA[2])
 # flex = Flex$new(token ='22092566548262639113984', query = '803831')
 # report = flex$get_flex_report()
 # flex_reports_xml = list(flex_report_2022, flex_report_2023, report)
@@ -251,7 +264,7 @@ Strategy = R6::R6Class(
 # strategy = Strategy$new(flex_reports_xml, start_date = as.Date("2024-01-01"))
 # self = strategy$clone()
 
-# strategy = Strategy$new(flex_reports_xml, start_date = as.Date("2023-05-01"))
+# strategy = Strategy$new(flex_reports_xml, as.Date("2023-04-25")) # PRA
 # self = strategy$clone()
 #
 # strategy$calculate_nav_units("SPY", unit = NULL)
