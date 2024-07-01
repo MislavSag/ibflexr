@@ -155,8 +155,16 @@ Strategy = R6::R6Class(
       }
 
       # Filter by dates
-      nav_units = private$get_unit_prices(equity_curve, transfers, start_date = start_date)
-      nav_units_gross = private$get_unit_prices(equity_curve_gross, transfers, start_date = start_date)
+      nav_units = private$get_unit_prices(
+        equity_curve,
+        transfers,
+        start_date = start_date,
+        end_date = end_date)
+      nav_units_gross = private$get_unit_prices(
+        equity_curve_gross,
+        transfers,
+        start_date = start_date,
+        end_date = end_date)
 
       # Scale if unit is provided
       if (!is.null(unit)) {
