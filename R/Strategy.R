@@ -82,7 +82,7 @@ Strategy = R6::R6Class(
       xml_extracted = unique(xml_extracted)
 
       # Filter date after start_date for column tradeDate if tradeDate column exist in data.table
-      if (!is.null(self$start_date) && filter_date == TRUE) {
+      if (filter_date == TRUE) {
         for (date in date_columns) {
           xml_extracted = private$filter_date(xml_extracted, date)
         }
@@ -194,7 +194,13 @@ Strategy = R6::R6Class(
       # dt = copy(xml_extracted)
       # date = "reportDate"
       if (date_ %in% colnames(dt)) {
-        dt = dt[get(date_) >= self$start_date]
+        if (!is.null(self$start_date) & !is.null(self$end_date)) {
+          dt = dt[get(date_) %between% c(self$start_date, self$end_date)]
+        } else if (!is.null(self$start_date) & is.null(self$end_date)) {
+          dt = dt[get(date_) >= self$start_date]
+        } else if (is.null(self$start_date) & !is.null(self$end_date)) {
+          dt = dt[get(date_) <= self$end_date]
+        }
       }
       return(dt)
     },
