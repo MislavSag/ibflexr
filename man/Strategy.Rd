@@ -18,6 +18,8 @@ The Strategy class is used to extract and clean data from the flex reports.
 \item{\code{flex_reports_xml}}{list of XML flex reports}
 
 \item{\code{start_date}}{The start date of the strategy}
+
+\item{\code{end_date}}{The end date of the strategy}
 }
 \if{html}{\out{</div>}}
 }
@@ -37,7 +39,7 @@ The Strategy class is used to extract and clean data from the flex reports.
 \subsection{Method \code{new()}}{
 Initialize the Strategy object
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Strategy$new(flex_reports_xml, start_date = NULL)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{Strategy$new(flex_reports_xml, start_date = NULL, end_date = NULL)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
@@ -46,6 +48,8 @@ Initialize the Strategy object
 \item{\code{flex_reports_xml}}{list of XML flex reports}
 
 \item{\code{start_date}}{The start date of the strategy}
+
+\item{\code{end_date}}{The end date of the strategy}
 }
 \if{html}{\out{</div>}}
 }
@@ -98,6 +102,7 @@ Calculate NAV units
 \if{html}{\out{<div class="r">}}\preformatted{Strategy$calculate_nav_units(
   benchmark_symbol = NULL,
   start_date = self$start_date,
+  end_date = self$end_date,
   unit = NULL
 )}\if{html}{\out{</div>}}
 }
@@ -108,6 +113,8 @@ Calculate NAV units
 \item{\code{benchmark_symbol}}{The benchmark symbol}
 
 \item{\code{start_date}}{The start date}
+
+\item{\code{end_date}}{The end date}
 
 \item{\code{unit}}{The unit}
 }

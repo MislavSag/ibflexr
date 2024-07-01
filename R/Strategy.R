@@ -21,20 +21,25 @@ Strategy = R6::R6Class(
     #' @field start_date The start date of the strategy
     start_date = NULL,
 
+    #' @field end_date The end date of the strategy
+    end_date = NULL,
+
     #' @description
     #' Initialize the Strategy object
     #'
     #' @param flex_reports_xml list of XML flex reports
     #' @param start_date The start date of the strategy
+    #' @param end_date The end date of the strategy
     #'
     #' @return The Strategy object
-    initialize = function(flex_reports_xml, start_date = NULL) {
+    initialize = function(flex_reports_xml, start_date = NULL, end_date = NULL) {
       # DEBUG
       # self = list()
       # self$flex_reports_xml = flex_reports_xml
 
       self$flex_reports_xml = flex_reports_xml
       self$start_date = start_date
+      self$end_date = end_date
     },
 
     #' @description
@@ -104,11 +109,13 @@ Strategy = R6::R6Class(
     #'
     #' @param benchmark_symbol The benchmark symbol
     #' @param start_date The start date
+    #' @param end_date The end date
     #' @param unit The unit
     #'
     #' @return The NAV units
     calculate_nav_units = function(benchmark_symbol = NULL,
                                    start_date = self$start_date,
+                                   end_date = self$end_date,
                                    unit = NULL) {
       # Get transfers
       transfers = self$extract_node("Transfer", FALSE)
@@ -143,6 +150,9 @@ Strategy = R6::R6Class(
       if (is.null(start_date)) {
         start_date = equity_curve[, min(timestamp)]
       }
+      if (is.null(end_date)) {
+        end_date = equity_curve[, max(timestamp)]
+      }
 
       # Filter by dates
       nav_units = private$get_unit_prices(equity_curve, transfers, start_date = start_date)
@@ -159,7 +169,7 @@ Strategy = R6::R6Class(
         # benchmark_symbol = "SPY"
         benchmark_yahoo = Ticker$new(benchmark_symbol)
         benchmark = benchmark_yahoo$get_history(start = nav_units[, min(timestamp)-5],
-                                                end = Sys.Date(),
+                                                end = nav_units[, max(timestamp)+1],
                                                 interval = '1d')
         setDT(benchmark)
         benchmark[, date := as.Date(date)]
@@ -207,9 +217,12 @@ Strategy = R6::R6Class(
       # Return the modified data.table
       return(dt)
     },
-    get_unit_prices = function(equity_curve, transfers, start_date) {
-      dt_ = equity_curve[timestamp > start_date]
-      if (transfers[, max(timestamp)] < start_date) {
+    get_unit_prices = function(equity_curve, transfers, start_date, end_date) {
+      dt_ = equity_curve[timestamp %between% c(start_date, end_date)]
+      # If there are no transfers between start date and end date, we don't need
+      # to adjust for transfers. WE just need to scale
+      transfer_test = transfers[timestamp %between% dt_[, .(min(timestamp), max(timestamp))]]
+      if (nrow(transfer_test) == 0) {
         nav_units = scale1(as.xts.data.table(dt_), level = 100)
         nav_units = as.data.table(xts::as.xts(nav_units))
         setnames(nav_units, c("timestamp", "price"))
@@ -261,6 +274,7 @@ Strategy = R6::R6Class(
 
 # strategy = Strategy$new(flex_reports_xml, as.Date("2023-04-25")) # PRA
 # self = strategy$clone()
+# strategy = Strategy$new(flex_reports_xml, as.Date("2024-01-01"), end_date = as.Date("2024-03-01")) # PRA
 #
 # strategy$calculate_nav_units("SPY", unit = NULL)
 #
