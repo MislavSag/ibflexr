@@ -51,7 +51,7 @@ Strategy = R6::R6Class(
     #'
     #' @return The extracted node in data.table format
     extract_node = function(node, filter_date = TRUE) {
-      # node = "CashReportCurrency"
+      # node = "ChangeInNAV"
       # Extract node
       xml_l = lapply(self$flex_reports_xml, function(x) {
         # x = self$flex_reports_xml[[1]]
@@ -117,6 +117,22 @@ Strategy = R6::R6Class(
                                    start_date = self$start_date,
                                    end_date = self$end_date,
                                    unit = NULL) {
+      # Debug
+      # x$FlexQueryResponse$FlexStatements$FlexStatement$
+      # self$extract_node("TierInterestDetail", FALSE)
+      # self$extract_node("CashTransaction", FALSE)
+      # self$extract_node("CashReportCurrency", FALSE)
+      # self$extract_node("PriorPeriodPosition", FALSE)
+      # self$extract_node("Transfer", FALSE)
+      # self$extract_node("EquitySummaryByReportDateInBase", FALSE)
+      # self$extract_node("UnbundledCommissionDetail", FALSE)
+      # self$extract_node("ChangeInDividendAccrual", FALSE)
+      # self$extract_node("SecurityInfo", FALSE)
+      # self$extract_node("MTDYTDPerformanceSummaryUnderlying", FALSE)
+      # self$extract_node("ChangeInNAV", FALSE)
+      # self$extract_node("AccountInformation", FALSE)
+      # self$extract_node("UnsettledTransfers", FALSE)
+
       # Get transfers
       transfers = self$extract_node("Transfer", FALSE)
       transfers = transfers[, .(date, cashTransfer)]
@@ -241,9 +257,12 @@ Strategy = R6::R6Class(
         nav_units = as.data.table(xts::as.xts(nav_units))
         setnames(nav_units, c("timestamp", "price"))
       } else {
-        cf = copy(transfers)
+        cf = transfers[, .(timestamp, NAV = as.numeric(NAV))]
         cf[timestamp < start_date, timestamp := dt_[, min(timestamp)]]
         cf = cf[, .(NAV = sum(NAV)), by = timestamp]
+        if (cf[1, timestamp] == dt_[1, timestamp]) {
+          cf[1, NAV := as.numeric(dt_[1, NAV])]
+        }
         nav_units = unit_prices(
           as.data.frame(dt_),
           cashflow = as.data.frame(cf),
@@ -255,6 +274,7 @@ Strategy = R6::R6Class(
   )
 )
 
+# DEBUG
 # library(R6)
 # library(httr)
 # library(rvest)
@@ -275,8 +295,12 @@ Strategy = R6::R6Class(
 #   "https://snpmarketdata.blob.core.windows.net/flex/exuberbondsml_2023.xml",
 #   "https://snpmarketdata.blob.core.windows.net/flex/exuberv1.xml"
 # )
-# flex_report_2022 = read_xml(FLEX_PRA[1])
-# flex_report_2023 = read_xml(FLEX_PRA[2])
+# pra_start = as.Date("2023-04-25")
+# strategy = Strategy$new(lapply(FLEX_PRA, read_xml), start_date = pra_start)
+# self = strategy$clone()
+
+# flex_report_2023 = read_xml(FLEX_PRA[1])
+# flex_report_2024 = read_xml(FLEX_PRA[2])
 # report = read_xml(FLEX_PRA[3])
 # flex = Flex$new(token ='22092566548262639113984', query = '803831')
 # report = flex$get_flex_report()
