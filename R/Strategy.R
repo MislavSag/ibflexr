@@ -132,6 +132,10 @@ Strategy = R6::R6Class(
       # self$extract_node("ChangeInNAV", FALSE)
       # self$extract_node("AccountInformation", FALSE)
       # self$extract_node("UnsettledTransfers", FALSE)
+      # self$extract_node("ChangeInPositionValues", FALSE)
+      # self$extract_node("PriorPeriodPosition", FALSE)
+      # self$extract_node("OpenPosition", FALSE)
+      # self$extract_node("NetStockPositionSummary", FALSE)
 
       # Get transfers
       transfers = self$extract_node("Transfer", FALSE)
@@ -192,8 +196,8 @@ Strategy = R6::R6Class(
       if (!is.null(benchmark_symbol)) {
         # benchmark_symbol = "SPY"
         benchmark_yahoo = Ticker$new(benchmark_symbol)
-        benchmark = benchmark_yahoo$get_history(start = nav_units[, min(timestamp)-5],
-                                                end = nav_units[, max(timestamp)+1],
+        benchmark = benchmark_yahoo$get_history(start = nav_units[, min(timestamp)],
+                                                end = nav_units[, max(timestamp)],
                                                 interval = '1d')
         setDT(benchmark)
         benchmark[, date := as.Date(date)]
@@ -296,7 +300,8 @@ Strategy = R6::R6Class(
 #   "https://snpmarketdata.blob.core.windows.net/flex/exuberv1.xml"
 # )
 # pra_start = as.Date("2023-04-25")
-# strategy = Strategy$new(lapply(FLEX_PRA, read_xml), start_date = pra_start)
+# strategy = Strategy$new(lapply(FLEX_MINMAX[[3]], read_xml), start_date = as.Date("2024-07-01"))
+# strategy = Strategy$new(lapply(FLEX_MINMAX, read_xml), start_date = pra_start)
 # self = strategy$clone()
 
 # flex_report_2023 = read_xml(FLEX_PRA[1])
@@ -317,11 +322,12 @@ Strategy = R6::R6Class(
 # strategy$calculate_nav_units("SPY", unit = NULL)
 #
 # find node
-# x = as_list(flex_reports_xml[[1]])
+# flex_reports_xml = lapply(FLEX_MINMAX, read_xml)
+# x = as_list(flex_reports_xml[[2]])
 # x = x$FlexQueryResponse$FlexStatements$FlexStatement
 # x = x[sapply(x, function(y) !all(y == "\n"))]
 # names(x)
-# x$TierInterestDetails$TierInterestDetail
+# x$OpenPositions$OpenPosition
 # strategy$extract_node("TierInterestDetail")
 # strategy_pra = Strategy$new(lapply(FLEX_PRA, read_xml, "2023-04-25"))
 #
