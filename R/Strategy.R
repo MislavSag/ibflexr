@@ -147,6 +147,7 @@ Strategy = R6::R6Class(
       equity_curve = self$extract_node("EquitySummaryByReportDateInBase", FALSE)
       equity_curve = equity_curve[, .(timestamp = reportDate, NAV = total)]
       equity_curve = equity_curve[NAV > 0]
+      equity_curve = unique(equity_curve, by = "timestamp", fromLast = TRUE)
       setorder(equity_curve, "timestamp")
 
       # see this issue: https://github.com/enricoschumann/PMwR/issues/1#issuecomment-1533207687
@@ -198,7 +199,7 @@ Strategy = R6::R6Class(
         # benchmark_symbol = "SPY"
         benchmark_yahoo = Ticker$new(benchmark_symbol)
         benchmark = benchmark_yahoo$get_history(start = nav_units[, min(timestamp)],
-                                                end = nav_units[, max(timestamp)],
+                                                end = nav_units[, max(timestamp)] + 1,
                                                 interval = '1d')
         setDT(benchmark)
         benchmark[, date := as.Date(date)]
@@ -289,6 +290,7 @@ Strategy = R6::R6Class(
 # library(yahoofinancer)
 # FLEX_PRA = c(
 #   "https://snpmarketdata.blob.core.windows.net/flex/pra_2023.xml",
+#   "https://snpmarketdata.blob.core.windows.net/flex/pra_old_account.xml",
 #   "https://snpmarketdata.blob.core.windows.net/flex/pra.xml"
 # )
 # FLEX_MINMAX = c(
@@ -301,14 +303,19 @@ Strategy = R6::R6Class(
 #   "https://snpmarketdata.blob.core.windows.net/flex/exuberv1.xml"
 # )
 # pra_start = as.Date("2023-04-25")
-# strategy = Strategy$new(lapply(FLEX_MINMAX[[3]], read_xml), start_date = as.Date("2024-07-01"))
+# strategy = Strategy$new(lapply(FLEX_PRA[[2]], read_xml), start_date = as.Date("2024-07-01"))
 # strategy = Strategy$new(lapply(FLEX_PRA, read_xml), start_date = pra_start)
 # self = strategy$clone()
+# strategy = Strategy$new(lapply(FLEX_MINMAX, read_xml), start_date = minmax_start)
+# self = strategy$clone()
+# strategy = Strategy$new(lapply(FLEX_EXUBER, read_xml), start_date = pra_start)
+# self = strategy$clone()
+# strategy$calculate_nav_units("SPY")
 
 # flex_report_2023 = read_xml(FLEX_PRA[1])
 # flex_report_2024 = read_xml(FLEX_PRA[2])
 # report = read_xml(FLEX_PRA[3])
-# flex = Flex$new(token ='22092566548262639113984', query = '803831')
+# flex = Flex$new(token ='537279325090849431098493', query = '1056812')
 # report = flex$get_flex_report()
 # flex_reports_xml = list(flex_report_2022, flex_report_2023, report)
 # flex_reports_xml = list(flex_report_2022, flex_report_2023)
