@@ -140,7 +140,7 @@ Strategy = R6::R6Class(
       # Get transfers
       transfers = self$extract_node("Transfer", FALSE)
       transfers = transfers[, .(date, cashTransfer)]
-      transfers = transfers[cashTransfer > 0]
+      transfers= transfers[cashTransfer != 0]
       setnames(transfers, c("timestamp", "NAV"))
 
       # Get NAV values
@@ -296,6 +296,7 @@ Strategy = R6::R6Class(
 # FLEX_MINMAX = c(
 #   "https://snpmarketdata.blob.core.windows.net/flex/minmax_2022.xml",
 #   "https://snpmarketdata.blob.core.windows.net/flex/minmax_2023.xml",
+#   "https://snpmarketdata.blob.core.windows.net/flex/minmax_old_account.xml",
 #   "https://snpmarketdata.blob.core.windows.net/flex/minmax.xml"
 # )
 # FLEX_EXUBER = c(
@@ -306,7 +307,7 @@ Strategy = R6::R6Class(
 # strategy = Strategy$new(lapply(FLEX_PRA[[2]], read_xml), start_date = as.Date("2024-07-01"))
 # strategy = Strategy$new(lapply(FLEX_PRA, read_xml), start_date = pra_start)
 # self = strategy$clone()
-# strategy = Strategy$new(lapply(FLEX_MINMAX, read_xml), start_date = minmax_start)
+# strategy = Strategy$new(lapply(FLEX_MINMAX, read_xml), start_date = pra_start)
 # self = strategy$clone()
 # strategy = Strategy$new(lapply(FLEX_EXUBER, read_xml), start_date = pra_start)
 # self = strategy$clone()
