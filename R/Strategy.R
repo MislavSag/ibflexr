@@ -140,6 +140,7 @@ Strategy = R6::R6Class(
       # Get transfers
       transfers = self$extract_node("Transfer", FALSE)
       transfers = transfers[, .(date, cashTransfer)]
+      transfers = transfers[cashTransfer > 0]
       setnames(transfers, c("timestamp", "NAV"))
 
       # Get NAV values
@@ -301,7 +302,7 @@ Strategy = R6::R6Class(
 # )
 # pra_start = as.Date("2023-04-25")
 # strategy = Strategy$new(lapply(FLEX_MINMAX[[3]], read_xml), start_date = as.Date("2024-07-01"))
-# strategy = Strategy$new(lapply(FLEX_MINMAX, read_xml), start_date = pra_start)
+# strategy = Strategy$new(lapply(FLEX_PRA, read_xml), start_date = pra_start)
 # self = strategy$clone()
 
 # flex_report_2023 = read_xml(FLEX_PRA[1])
