@@ -140,7 +140,8 @@ Strategy = R6::R6Class(
       # Get transfers
       transfers = self$extract_node("Transfer", FALSE)
       transfers = transfers[, .(date, cashTransfer)]
-      transfers= transfers[cashTransfer != 0]
+      transfers = transfers[, .(cashTransfer = sum(cashTransfer)), by = date]
+      transfers = transfers[cashTransfer != 0]
       setnames(transfers, c("timestamp", "NAV"))
 
       # Get NAV values
