@@ -200,7 +200,7 @@ Strategy = R6::R6Class(
         # benchmark_symbol = "SPY"
         benchmark_yahoo = Ticker$new(benchmark_symbol)
         benchmark = benchmark_yahoo$get_history(start = nav_units[, min(timestamp)],
-                                                end = nav_units[, max(timestamp)],
+                                                end = NULL,
                                                 interval = '1d')
         setDT(benchmark)
         benchmark[, date := as.Date(date)]
