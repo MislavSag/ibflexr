@@ -40,6 +40,12 @@ Strategy = R6::R6Class(
       # Set calendar
       qlcal::setCalendar("UnitedStates/NYSE")
 
+      # Test if there is APIKEY environ
+      test = Sys.getenv("APIKEY")
+      if (test == "") {
+        stop("FMP APIKEY is not set. Please set the APIKEY environment variable.")
+      }
+
       self$flex_reports_xml = flex_reports_xml
       self$start_date = start_date
       self$end_date = end_date
@@ -206,13 +212,21 @@ Strategy = R6::R6Class(
       # Add benchmark
       if (!is.null(benchmark_symbol)) {
         # benchmark_symbol = "SPY"
-        benchmark_yahoo = Ticker$new(benchmark_symbol)
-        benchmark = benchmark_yahoo$get_history(start = nav_units[, min(timestamp)],
-                                                end = NULL,
-                                                interval = '1d')
+        url = "https://financialmodelingprep.com/stable/historical-price-eod/dividend-adjusted"
+        p = GET(
+          url,
+          query = list(
+            symbol = benchmark_symbol,
+            from = as.character(nav_units[, min(timestamp)]),
+            apikey = Sys.getenv("APIKEY")
+          ),
+        )
+        res = content(p)
+        res = lapply(res, as.data.table)
+        benchmark = rbindlist(res, fill = TRUE)
         setDT(benchmark)
         benchmark[, date := as.Date(date)]
-        benchmark[, adj_close := as.numeric(adj_close)]
+        benchmark[, adj_close := as.numeric(adjClose)]
         nav_units = benchmark[nav_units, on = c("date" = "timestamp")]
         nav_units[, close_unit := adj_close / first(adj_close) * 100]
       }
