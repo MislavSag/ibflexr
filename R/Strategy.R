@@ -37,6 +37,9 @@ Strategy = R6::R6Class(
       # self = list()
       # self$flex_reports_xml = flex_reports_xml
 
+      # Set calendar
+      qlcal::setCalendar("UnitedStates/NYSE")
+
       self$flex_reports_xml = flex_reports_xml
       self$start_date = start_date
       self$end_date = end_date
@@ -154,6 +157,11 @@ Strategy = R6::R6Class(
       # see this issue: https://github.com/enricoschumann/PMwR/issues/1#issuecomment-1533207687
       if (!is.null(transfers) && nrow(transfers) > 2) {
         transfers[3:nrow(transfers), timestamp := timestamp - 1]
+        transfers[3:nrow(transfers), timestamp := as.Date(
+          vapply(timestamp,
+                 FUN = function(x) qlcal::advanceDate(x, -1L),
+                 FUN.VALUE = double(1L))
+          )]
         equity_curve[timestamp %in% transfers[3:nrow(transfers), timestamp],
                      NAV := NAV + transfers[3:nrow(transfers), NAV]]
       }
@@ -270,6 +278,8 @@ Strategy = R6::R6Class(
         if (cf[1, timestamp] == dt_[1, timestamp]) {
           cf[1, NAV := as.numeric(dt_[1, NAV])]
         }
+        cf_ = copy(cf)
+        cf_[3, NAV := -NAV]
         nav_units = unit_prices(
           as.data.frame(dt_),
           cashflow = as.data.frame(cf),

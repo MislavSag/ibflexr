@@ -5,6 +5,7 @@
 #' @import xml2
 #' @import httr
 #' @import yahoofinancer
+#' @import qlcal
 #' @importFrom PMwR unit_prices scale1
 
 "_PACKAGE"
