@@ -228,7 +228,7 @@ Strategy = R6::R6Class(
         benchmark[, date := as.Date(date)]
         benchmark[, adj_close := as.numeric(adjClose)]
         nav_units = benchmark[nav_units, on = c("date" = "timestamp")]
-        nav_units[, close_unit := adj_close / first(adj_close) * 100]
+        nav_units[, close_unit := adj_close / data.table::first(adj_close) * 100]
       }
 
       # Set names as Strategy and Benchmark
@@ -322,6 +322,7 @@ Strategy = R6::R6Class(
 #   "https://snpmarketdata.blob.core.windows.net/flex/minmax_2022.xml",
 #   "https://snpmarketdata.blob.core.windows.net/flex/minmax_2023.xml",
 #   "https://snpmarketdata.blob.core.windows.net/flex/minmax_old_account.xml",
+#   "https://snpmarketdata.blob.core.windows.net/flex/minmax_2023.xml",
 #   "https://snpmarketdata.blob.core.windows.net/flex/minmax.xml"
 # )
 # FLEX_EXUBER = c(
