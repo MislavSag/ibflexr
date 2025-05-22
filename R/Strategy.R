@@ -146,6 +146,8 @@ Strategy = R6::R6Class(
       # self$extract_node("OpenPosition", FALSE)
       # self$extract_node("NetStockPositionSummary", FALSE)
 
+      print("START!!!!!!!!!!!!!!!!!")
+
       # Get transfers
       transfers = self$extract_node("Transfer", FALSE)
       transfers = transfers[, .(date, cashTransfer)]
@@ -161,16 +163,17 @@ Strategy = R6::R6Class(
       setorder(equity_curve, "timestamp")
 
       # see this issue: https://github.com/enricoschumann/PMwR/issues/1#issuecomment-1533207687
+      print(transfers)
       if (!is.null(transfers) && nrow(transfers) > 2) {
-        transfers[3:nrow(transfers), timestamp := timestamp - 1]
         transfers[3:nrow(transfers), timestamp := as.Date(
           vapply(timestamp,
                  FUN = function(x) qlcal::advanceDate(x, -1L),
                  FUN.VALUE = double(1L))
-          )]
+        )]
         equity_curve[timestamp %in% transfers[3:nrow(transfers), timestamp],
                      NAV := NAV + transfers[3:nrow(transfers), NAV]]
       }
+      print(equity_curve)
 
       # Remove CFD costs and / or interests
       cfd_charges = self$extract_node("CFDCharge", FALSE)
@@ -213,6 +216,7 @@ Strategy = R6::R6Class(
       if (!is.null(benchmark_symbol)) {
         # benchmark_symbol = "SPY"
         url = "https://financialmodelingprep.com/stable/historical-price-eod/dividend-adjusted"
+        print(as.character(nav_units[, min(timestamp)]))
         p = GET(
           url,
           query = list(
@@ -221,22 +225,39 @@ Strategy = R6::R6Class(
             apikey = Sys.getenv("APIKEY")
           ),
         )
+        # p = GET(
+        #   "https://financialmodelingprep.com/stable/historical-price-eod/dividend-adjusted",
+        #   query = list(
+        #     symbol = "SPY",
+        #     from = "2022-11-21",
+        #     apikey = Sys.getenv("APIKEY")
+        #   ),
+        # )
         res = content(p)
         res = lapply(res, as.data.table)
         benchmark = rbindlist(res, fill = TRUE)
         setDT(benchmark)
+        print(benchmark)
         benchmark[, date := as.Date(date)]
         benchmark[, adj_close := as.numeric(adjClose)]
+        setorder(benchmark, date)
+        print(benchmark)
         nav_units = benchmark[nav_units, on = c("date" = "timestamp")]
         nav_units[, close_unit := adj_close / data.table::first(adj_close) * 100]
+        print(nav_units)
       }
 
       # Set names as Strategy and Benchmark
+      print(nav_units)
+      print(nav_units_gross)
       nav_units_merged = merge(nav_units[, .(date, Strategy = price, Benchmark = close_unit)],
                                nav_units_gross[, .(date = timestamp, StrategyGross = price)],
                                by = "date", all = TRUE)
+      print(nav_units_merged)
       nav_units_merged = na.omit(nav_units_merged, cols = c("Strategy", "Benchmark"))
       nav_units_merged = unique(nav_units_merged, by = c("date", "Strategy", "Benchmark"))
+
+      print(nav_units_merged)
 
       # plot(as.xts.data.table(nav_units[, .(date, Strategy, Benchmark)]))
       return(nav_units_merged)
