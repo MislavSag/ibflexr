@@ -163,8 +163,7 @@ Strategy = R6::R6Class(
       setorder(equity_curve, "timestamp")
 
       # see this issue: https://github.com/enricoschumann/PMwR/issues/1#issuecomment-1533207687
-      print(transfers)
-      if (!is.null(transfers) && nrow(transfers) > 2) {
+      if (!is.null(transfers) & nrow(transfers) > 2) {
         transfers[3:nrow(transfers), timestamp := as.Date(
           vapply(timestamp,
                  FUN = function(x) qlcal::advanceDate(x, -1L),
@@ -173,7 +172,6 @@ Strategy = R6::R6Class(
         equity_curve[timestamp %in% transfers[3:nrow(transfers), timestamp],
                      NAV := NAV + transfers[3:nrow(transfers), NAV]]
       }
-      print(equity_curve)
 
       # Remove CFD costs and / or interests
       cfd_charges = self$extract_node("CFDCharge", FALSE)
@@ -185,6 +183,8 @@ Strategy = R6::R6Class(
       equity_curve_gross[, cum_interests := cumsum(nafill(totalInterest, fill = 0))]
       equity_curve_gross[, NAV := NAV - cum_cfd_cost - cum_interests]
       equity_curve_gross = equity_curve_gross[, .(timestamp = valueDate, NAV)]
+
+      print("Are we here?")
 
       # Set start_date if it is not provided
       if (is.null(start_date)) {
@@ -215,49 +215,55 @@ Strategy = R6::R6Class(
       # Add benchmark
       if (!is.null(benchmark_symbol)) {
         # benchmark_symbol = "SPY"
-        url = "https://financialmodelingprep.com/stable/historical-price-eod/dividend-adjusted"
-        print(as.character(nav_units[, min(timestamp)]))
-        p = GET(
-          url,
-          query = list(
-            symbol = benchmark_symbol,
-            from = as.character(nav_units[, min(timestamp)]),
-            apikey = Sys.getenv("APIKEY")
-          ),
-        )
+        benchmark_yahoo = Ticker$new(benchmark_symbol)
+        benchmark = benchmark_yahoo$get_history(start = nav_units[, min(timestamp)],
+                                                end = NULL,
+                                                interval = '1d')
+        setDT(benchmark)
+        benchmark[, date := as.Date(date)]
+        benchmark[, adj_close := as.numeric(adj_close)]
+        nav_units = benchmark[nav_units, on = c("date" = "timestamp")]
+        nav_units[, close_unit := adj_close / data.table::first(adj_close) * 100]
+
+        # # benchmark_symbol = "SPY"
+        # url = "https://financialmodelingprep.com/stable/historical-price-eod/dividend-adjusted"
+        # print(as.character(nav_units[, min(timestamp)]))
         # p = GET(
-        #   "https://financialmodelingprep.com/stable/historical-price-eod/dividend-adjusted",
+        #   url,
         #   query = list(
-        #     symbol = "SPY",
-        #     from = "2022-11-21",
+        #     symbol = benchmark_symbol,
+        #     from = as.character(nav_units[, min(timestamp)]),
         #     apikey = Sys.getenv("APIKEY")
         #   ),
         # )
-        res = content(p)
-        res = lapply(res, as.data.table)
-        benchmark = rbindlist(res, fill = TRUE)
-        setDT(benchmark)
-        print(benchmark)
-        benchmark[, date := as.Date(date)]
-        benchmark[, adj_close := as.numeric(adjClose)]
-        setorder(benchmark, date)
-        print(benchmark)
-        nav_units = benchmark[nav_units, on = c("date" = "timestamp")]
-        nav_units[, close_unit := adj_close / data.table::first(adj_close) * 100]
-        print(nav_units)
+        # # p = GET(
+        # #   "https://financialmodelingprep.com/stable/historical-price-eod/dividend-adjusted",
+        # #   query = list(
+        # #     symbol = "SPY",
+        # #     from = "2022-11-21",
+        # #     apikey = Sys.getenv("APIKEY")
+        # #   ),
+        # # )
+        # res = content(p)
+        # res = lapply(res, as.data.table)
+        # benchmark = rbindlist(res, fill = TRUE)
+        # setDT(benchmark)
+        # benchmark[, date := as.Date(date)]
+        # benchmark[, adj_close := as.numeric(adjClose)]
+        # setorder(benchmark, date)
+        # print(benchmark)
+        # nav_units = benchmark[nav_units, on = c("date" = "timestamp")]
+        # nav_units = na.omit(nav_units, cols = c("adj_close"))
+        # nav_units[, close_unit := (adj_close / data.table::first(adj_close)) * 100]
       }
 
       # Set names as Strategy and Benchmark
-      print(nav_units)
-      print(nav_units_gross)
       nav_units_merged = merge(nav_units[, .(date, Strategy = price, Benchmark = close_unit)],
                                nav_units_gross[, .(date = timestamp, StrategyGross = price)],
                                by = "date", all = TRUE)
-      print(nav_units_merged)
       nav_units_merged = na.omit(nav_units_merged, cols = c("Strategy", "Benchmark"))
       nav_units_merged = unique(nav_units_merged, by = c("date", "Strategy", "Benchmark"))
 
-      print(nav_units_merged)
 
       # plot(as.xts.data.table(nav_units[, .(date, Strategy, Benchmark)]))
       return(nav_units_merged)
@@ -283,7 +289,6 @@ Strategy = R6::R6Class(
       dt[, daily_return := c(NA, diff(price) / head(price, -1))]
 
       # Adjust the returns to reflect what they would be without leverage
-      dt[, unleveraged_return := daily_return / unit]
 
       # Initial NAV value
       initial_NAV = dt$price[1]
@@ -313,8 +318,6 @@ Strategy = R6::R6Class(
         if (cf[1, timestamp] == dt_[1, timestamp]) {
           cf[1, NAV := as.numeric(dt_[1, NAV])]
         }
-        cf_ = copy(cf)
-        cf_[3, NAV := -NAV]
         nav_units = unit_prices(
           as.data.frame(dt_),
           cashflow = as.data.frame(cf),
