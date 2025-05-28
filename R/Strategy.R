@@ -60,7 +60,7 @@ Strategy = R6::R6Class(
     #'
     #' @return The extracted node in data.table format
     extract_node = function(node, filter_date = TRUE) {
-      # node = "EquitySummaryByReportDateInBase"
+      # node = "CashReportCurrency"
       # Extract node
       xml_l = lapply(self$flex_reports_xml, function(x) {
         # x = self$flex_reports_xml[[1]]
@@ -75,24 +75,24 @@ Strategy = R6::R6Class(
       })
       xml_extracted = rbindlist(xml_l, fill = TRUE)
 
+      # Cleaning
+      xml_extracted = xml_extracted[, .SD, .SDcols = !colSums(is.na(xml_extracted)) == nrow(xml_extracted)]
+      xml_extracted = xml_extracted[, .SD, .SDcols = colSums(xml_extracted != 0, na.rm = TRUE) > 0]
+      xml_extracted = xml_extracted[, .SD, .SDcols = (!colSums(xml_extracted == "", na.rm = TRUE) == nrow(xml_extracted))]
+      xml_extracted = unique(xml_extracted)
+
       # Type conversion
       xml_extracted = xml_extracted[, lapply(.SD, type.convert, as.is = TRUE)]
       date_columns = colnames(xml_extracted)[grepl("date", colnames(xml_extracted), ignore.case = TRUE)]
       time_columns = colnames(xml_extracted)[grepl("time", colnames(xml_extracted), ignore.case = TRUE)]
       date_columns = setdiff(date_columns, time_columns)
       # xml_extracted[, (date_columns) := lapply(.SD, as.Date, format = "%Y-%m-%d"), .SDcols = date_columns] # OLD WAY
+      xml_extracted[, ..date_columns]
       xml_extracted[, (date_columns) := lapply(.SD, function(x) {
         x = as.character(x)
         x = anydate(x)
       }), .SDcols = date_columns]
       xml_extracted[, (time_columns) := lapply(.SD, as.POSIXct, format = "%Y-%m-%d;%H:%M:%S"), .SDcols = time_columns]
-
-      # Cleaning
-      xml_extracted = xml_extracted[, .SD, .SDcols = !colSums(is.na(xml_extracted)) == nrow(xml_extracted)]
-      xml_extracted = xml_extracted[, .SD, .SDcols = colSums(xml_extracted != 0, na.rm = TRUE) > 0]
-
-      # Keep only unique rows
-      xml_extracted = unique(xml_extracted)
 
       # Filter date after start_date for column tradeDate if tradeDate column exist in data.table
       if (filter_date == TRUE) {
@@ -265,9 +265,6 @@ Strategy = R6::R6Class(
                                by = "date", all = TRUE)
       nav_units_merged = na.omit(nav_units_merged, cols = c("Strategy", "Benchmark"))
       nav_units_merged = unique(nav_units_merged, by = c("date", "Strategy", "Benchmark"))
-
-
-      # plot(as.xts.data.table(nav_units[, .(date, Strategy, Benchmark)]))
       return(nav_units_merged)
     }
   ),
@@ -363,14 +360,25 @@ Strategy = R6::R6Class(
 # strategy = Strategy$new(lapply(FLEX_PRA[[2]], read_xml), start_date = as.Date("2024-07-01"))
 # strategy = Strategy$new(lapply(FLEX_PRA, read_xml), start_date = pra_start)
 # self = strategy$clone()
-# strategy = Strategy$new(lapply(FLEX_MINMAX, read_xml), start_date = pra_start)
+# MINMAX
+# strategy = Strategy$new(lapply(FLEX_MINMAX, read_xml), start_date = as.Date("2022-11-01"))
 # self = strategy$clone()
+# strategy$calculate_nav_units("SPY")
+# # EXUBER
 # strategy = Strategy$new(lapply(FLEX_EXUBER, read_xml), start_date = pra_start)
 # self = strategy$clone()
 # strategy$calculate_nav_units("SPY")
+# # RISKCOMBO
 # strategy = Strategy$new(lapply(FLEX_RISKCOMBO, read_xml), start_date = as.Date("2025-05-21"))
 # self = strategy$clone()
 # strategy$calculate_nav_units("SPY")
+# Try other imports
+# strategy$extract_node("CashReportCurrency", FALSE)[]
+# strategy$extract_node("EquitySummaryByReportDateInBase")[]
+# strategy$extract_node("Trade")[]
+# strategy$extract_node("CFDCharge")[]
+# strategy$extract_node("PriorPeriodPosition")[]
+# strategy$extract_node("OpenPosition")[]
 
 # flex_report_2023 = read_xml(FLEX_PRA[1])
 # flex_report_2024 = read_xml(FLEX_PRA[2])
