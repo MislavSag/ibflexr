@@ -78,13 +78,13 @@ Strategy = R6::R6Class(
       # Type conversion
       xml_extracted = xml_extracted[, lapply(.SD, type.convert, as.is = TRUE)]
       date_columns = colnames(xml_extracted)[grepl("date", colnames(xml_extracted), ignore.case = TRUE)]
+      time_columns = colnames(xml_extracted)[grepl("time", colnames(xml_extracted), ignore.case = TRUE)]
       date_columns = setdiff(date_columns, time_columns)
       # xml_extracted[, (date_columns) := lapply(.SD, as.Date, format = "%Y-%m-%d"), .SDcols = date_columns] # OLD WAY
       xml_extracted[, (date_columns) := lapply(.SD, function(x) {
         x = as.character(x)
         x = anydate(x)
       }), .SDcols = date_columns]
-      time_columns = colnames(xml_extracted)[grepl("time", colnames(xml_extracted), ignore.case = TRUE)]
       xml_extracted[, (time_columns) := lapply(.SD, as.POSIXct, format = "%Y-%m-%d;%H:%M:%S"), .SDcols = time_columns]
 
       # Cleaning
