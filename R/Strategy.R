@@ -60,7 +60,7 @@ Strategy = R6::R6Class(
     #'
     #' @return The extracted node in data.table format
     extract_node = function(node, filter_date = TRUE) {
-      # node = "ChangeInNAV"
+      # node = "EquitySummaryByReportDateInBase"
       # Extract node
       xml_l = lapply(self$flex_reports_xml, function(x) {
         # x = self$flex_reports_xml[[1]]
@@ -77,10 +77,14 @@ Strategy = R6::R6Class(
 
       # Type conversion
       xml_extracted = xml_extracted[, lapply(.SD, type.convert, as.is = TRUE)]
-      time_columns = colnames(xml_extracted)[grepl("time", colnames(xml_extracted), ignore.case = TRUE)]
       date_columns = colnames(xml_extracted)[grepl("date", colnames(xml_extracted), ignore.case = TRUE)]
       date_columns = setdiff(date_columns, time_columns)
-      xml_extracted[, (date_columns) := lapply(.SD, as.Date, format = "%Y-%m-%d"), .SDcols = date_columns]
+      # xml_extracted[, (date_columns) := lapply(.SD, as.Date, format = "%Y-%m-%d"), .SDcols = date_columns] # OLD WAY
+      xml_extracted[, (date_columns) := lapply(.SD, function(x) {
+        x = as.character(x)
+        x = anydate(x)
+      }), .SDcols = date_columns]
+      time_columns = colnames(xml_extracted)[grepl("time", colnames(xml_extracted), ignore.case = TRUE)]
       xml_extracted[, (time_columns) := lapply(.SD, as.POSIXct, format = "%Y-%m-%d;%H:%M:%S"), .SDcols = time_columns]
 
       # Cleaning
@@ -183,8 +187,6 @@ Strategy = R6::R6Class(
       equity_curve_gross[, cum_interests := cumsum(nafill(totalInterest, fill = 0))]
       equity_curve_gross[, NAV := NAV - cum_cfd_cost - cum_interests]
       equity_curve_gross = equity_curve_gross[, .(timestamp = valueDate, NAV)]
-
-      print("Are we here?")
 
       # Set start_date if it is not provided
       if (is.null(start_date)) {
@@ -337,6 +339,7 @@ Strategy = R6::R6Class(
 # library(data.table)
 # library(PMwR)
 # library(yahoofinancer)
+# library(anytime)
 # FLEX_PRA = c(
 #   "https://snpmarketdata.blob.core.windows.net/flex/pra_2023.xml",
 #   "https://snpmarketdata.blob.core.windows.net/flex/pra_old_account.xml",
@@ -353,6 +356,9 @@ Strategy = R6::R6Class(
 #   "https://snpmarketdata.blob.core.windows.net/flex/exuberbondsml_2023.xml",
 #   "https://snpmarketdata.blob.core.windows.net/flex/exuberv1.xml"
 # )
+# FLEX_RISKCOMBO = c(
+#   "https://snpmarketdata.blob.core.windows.net/flex/riskcombo.xml"
+# )
 # pra_start = as.Date("2023-04-25")
 # strategy = Strategy$new(lapply(FLEX_PRA[[2]], read_xml), start_date = as.Date("2024-07-01"))
 # strategy = Strategy$new(lapply(FLEX_PRA, read_xml), start_date = pra_start)
@@ -360,6 +366,9 @@ Strategy = R6::R6Class(
 # strategy = Strategy$new(lapply(FLEX_MINMAX, read_xml), start_date = pra_start)
 # self = strategy$clone()
 # strategy = Strategy$new(lapply(FLEX_EXUBER, read_xml), start_date = pra_start)
+# self = strategy$clone()
+# strategy$calculate_nav_units("SPY")
+# strategy = Strategy$new(lapply(FLEX_RISKCOMBO, read_xml), start_date = as.Date("2025-05-21"))
 # self = strategy$clone()
 # strategy$calculate_nav_units("SPY")
 
