@@ -60,7 +60,7 @@ Strategy = R6::R6Class(
     #'
     #' @return The extracted node in data.table format
     extract_node = function(node, filter_date = TRUE) {
-      # node = "CashReportCurrency"
+      # node = "Trade"
       # Extract node
       xml_l = lapply(self$flex_reports_xml, function(x) {
         # x = self$flex_reports_xml[[1]]
@@ -112,7 +112,7 @@ Strategy = R6::R6Class(
       trades = self$extract_node("Trade")
       trades = trades[, .(
         q = sum(quantity),
-        p = weighted.mean(tradePrice, quantity)), by = dateTime]
+        p = weighted.mean(tradePrice, quantity)), by = tradeDate]
       setorder(trades, dateTime)
       return(trades)
     },
@@ -356,6 +356,7 @@ Strategy = R6::R6Class(
 # FLEX_RISKCOMBO = c(
 #   "https://snpmarketdata.blob.core.windows.net/flex/riskcombo.xml"
 # )
+# # PRA
 # pra_start = as.Date("2023-04-25")
 # strategy = Strategy$new(lapply(FLEX_PRA[[2]], read_xml), start_date = as.Date("2024-07-01"))
 # strategy = Strategy$new(lapply(FLEX_PRA, read_xml), start_date = pra_start)
@@ -379,6 +380,7 @@ Strategy = R6::R6Class(
 # strategy$extract_node("CFDCharge")[]
 # strategy$extract_node("PriorPeriodPosition")[]
 # strategy$extract_node("OpenPosition")[]
+# strategy$summary_cfd_trades()[]
 
 # flex_report_2023 = read_xml(FLEX_PRA[1])
 # flex_report_2024 = read_xml(FLEX_PRA[2])
