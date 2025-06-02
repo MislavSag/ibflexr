@@ -150,8 +150,6 @@ Strategy = R6::R6Class(
       # self$extract_node("OpenPosition", FALSE)
       # self$extract_node("NetStockPositionSummary", FALSE)
 
-      print("START!!!!!!!!!!!!!!!!!")
-
       # Get transfers
       transfers = self$extract_node("Transfer", FALSE)
       transfers = transfers[, .(date, cashTransfer)]
@@ -210,6 +208,7 @@ Strategy = R6::R6Class(
 
       # Scale if unit is provided
       if (!is.null(unit)) {
+        # unit = 2
         private$calculate_unleveraged_NAV(nav_units, unit)
         private$calculate_unleveraged_NAV(nav_units_gross, unit)
       }
@@ -288,6 +287,7 @@ Strategy = R6::R6Class(
       dt[, daily_return := c(NA, diff(price) / head(price, -1))]
 
       # Adjust the returns to reflect what they would be without leverage
+      dt[, unleveraged_return := daily_return / unit]
 
       # Initial NAV value
       initial_NAV = dt$price[1]
