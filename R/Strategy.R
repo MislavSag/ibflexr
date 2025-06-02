@@ -113,7 +113,7 @@ Strategy = R6::R6Class(
       trades = trades[, .(
         q = sum(quantity),
         p = weighted.mean(tradePrice, quantity)), by = tradeDate]
-      setorder(trades, dateTime)
+      setorder(trades, tradeDate)
       return(trades)
     },
 
