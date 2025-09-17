@@ -147,7 +147,7 @@ Strategy = R6::R6Class(
       # self$extract_node("UnsettledTransfers", FALSE)
       # self$extract_node("ChangeInPositionValues", FALSE)
       # self$extract_node("PriorPeriodPosition", FALSE)
-      # self$extract_node("OpenPosition", FALSE)
+      # self$extract_node("OpenPosition", FALSE)[]
       # self$extract_node("NetStockPositionSummary", FALSE)
 
       # Get transfers
@@ -408,10 +408,3 @@ Strategy = R6::R6Class(
 # x$OpenPositions$OpenPosition
 # strategy$extract_node("TierInterestDetail")
 # strategy_pra = Strategy$new(lapply(FLEX_PRA, read_xml, "2023-04-25"))
-#
-# > exuber_start
-# [1] "2024-05-01"
-# > minmax_start
-# [1] "2023-02-10"
-# > pra_start
-# [1] "2023-04-25"
