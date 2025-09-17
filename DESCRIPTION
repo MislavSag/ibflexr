@@ -1,7 +1,7 @@
 Package: ibflexr
 Type: Package
 Title: Managae flex reports and prepaare data for quant analysis
-Version: 0.1.0
+Version: 0.2.0
 Author: Mislav Sagovac
 Maintainer: Mislav Sagovac  <mislav.sagovac@contentio.biz>
 Description: Dowbnload flex reports from Interactive Brokers and prepare data for quant analysis.
@@ -19,4 +19,4 @@ Imports:
     anytime
 Encoding: UTF-8
 LazyData: true
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.3
