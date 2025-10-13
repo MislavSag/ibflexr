@@ -178,7 +178,11 @@ Strategy = R6::R6Class(
       # Remove CFD costs and / or interests
       cfd_charges = self$extract_node("CFDCharge", FALSE)
       interests = self$extract_node("TierInterestDetail", FALSE)
-      interests = interests[, .(totalInterest = sum(totalInterest, na.rm = TRUE)), by = valueDate]
+      if (is.null(interests)) {
+        interests = data.table(valueDate = as.Date(character()), totalInterest = numeric())
+      } else {
+        interests = interests[, .(totalInterest = sum(totalInterest, na.rm = TRUE)), by = valueDate]
+      }
       equity_curve_gross = cfd_charges[equity_curve, on = c("date" = "timestamp")]
       equity_curve_gross = interests[equity_curve_gross, on = c("valueDate" = "date")]
       equity_curve_gross[, cum_cfd_cost := cumsum(nafill(total, fill = 0))]
