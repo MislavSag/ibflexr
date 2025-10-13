@@ -76,6 +76,10 @@ Strategy = R6::R6Class(
       xml_extracted = rbindlist(xml_l, fill = TRUE)
 
       # Cleaning
+      # Early return if empty
+      if (nrow(xml_extracted) == 0 || ncol(xml_extracted) == 0) {
+        return(NULL)  # or return(NULL) if that's better for your downstream
+      }
       xml_extracted = xml_extracted[, .SD, .SDcols = !colSums(is.na(xml_extracted)) == nrow(xml_extracted)]
       xml_extracted = xml_extracted[, .SD, .SDcols = colSums(xml_extracted != 0, na.rm = TRUE) > 0]
       xml_extracted = xml_extracted[, .SD, .SDcols = (!colSums(xml_extracted == "", na.rm = TRUE) == nrow(xml_extracted))]
