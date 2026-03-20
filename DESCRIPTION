@@ -16,7 +16,8 @@ Imports:
     yahoofinancer,
     PMwR,
     qlcal,
-    anytime
+    anytime,
+    quantmod
 Encoding: UTF-8
 LazyData: true
 RoxygenNote: 7.3.3

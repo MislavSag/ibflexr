@@ -156,10 +156,15 @@ Strategy = R6::R6Class(
 
       # Get transfers
       transfers = self$extract_node("Transfer", FALSE)
-      transfers = transfers[, .(date, cashTransfer)]
-      transfers = transfers[, .(cashTransfer = sum(cashTransfer)), by = date]
-      transfers = transfers[cashTransfer != 0]
-      setnames(transfers, c("timestamp", "NAV"))
+      if (is.null(transfers)) {
+        transfers = data.table(timestamp = as.Date(character()), NAV = numeric())
+      } else {
+        transfers = transfers[, .(date, cashTransfer)]
+        transfers = transfers[, .(cashTransfer = sum(cashTransfer)), by = date]
+        transfers = transfers[cashTransfer != 0]
+        setnames(transfers, c("timestamp", "NAV"))
+        setorder(transfers, timestamp)
+      }
 
       # Get NAV values
       equity_curve = self$extract_node("EquitySummaryByReportDateInBase", FALSE)
@@ -167,17 +172,6 @@ Strategy = R6::R6Class(
       equity_curve = equity_curve[NAV > 0]
       equity_curve = unique(equity_curve, by = "timestamp", fromLast = TRUE)
       setorder(equity_curve, "timestamp")
-
-      # see this issue: https://github.com/enricoschumann/PMwR/issues/1#issuecomment-1533207687
-      if (!is.null(transfers) & nrow(transfers) > 2) {
-        transfers[3:nrow(transfers), timestamp := as.Date(
-          vapply(timestamp,
-                 FUN = function(x) qlcal::advanceDate(x, -1L),
-                 FUN.VALUE = double(1L))
-        )]
-        equity_curve[timestamp %in% transfers[3:nrow(transfers), timestamp],
-                     NAV := NAV + transfers[3:nrow(transfers), NAV]]
-      }
 
       # Remove CFD costs and / or interests
       cfd_charges = self$extract_node("CFDCharge", FALSE)
@@ -213,6 +207,7 @@ Strategy = R6::R6Class(
         transfers,
         start_date = start_date,
         end_date = end_date)
+      # nav_units[, plot(price)]
 
       # Scale if unit is provided
       if (!is.null(unit)) {
@@ -224,13 +219,10 @@ Strategy = R6::R6Class(
       # Add benchmark
       if (!is.null(benchmark_symbol)) {
         # benchmark_symbol = "SPY"
-        benchmark_yahoo = Ticker$new(benchmark_symbol)
-        benchmark = benchmark_yahoo$get_history(start = nav_units[, min(timestamp)],
-                                                end = NULL,
-                                                interval = '1d')
-        setDT(benchmark)
-        benchmark[, date := as.Date(date)]
-        benchmark[, adj_close := as.numeric(adj_close)]
+        getSymbols("SPY")
+        benchmark  = as.data.table(SPY)
+        benchmark = benchmark[, .(date = index, adj_close = SPY.Adjusted)]
+        benchmark = na.omit(benchmark)
         nav_units = benchmark[nav_units, on = c("date" = "timestamp")]
         nav_units[, close_unit := adj_close / data.table::first(adj_close) * 100]
 
@@ -311,27 +303,45 @@ Strategy = R6::R6Class(
     },
     get_unit_prices = function(equity_curve, transfers, start_date, end_date) {
       dt_ = equity_curve[timestamp %between% c(start_date, end_date)]
+      if (nrow(dt_) == 0) {
+        return(data.table(timestamp = as.Date(character()), price = numeric()))
+      }
       # If there are no transfers between start date and end date, we don't need
       # to adjust for transfers. WE just need to scale
-      transfer_test = transfers[timestamp %between% dt_[, .(min(timestamp), max(timestamp))]]
-      if (nrow(transfer_test) == 0) {
+      if (nrow(transfers) == 0) {
         nav_units = scale1(as.xts.data.table(dt_), level = 100)
         nav_units = as.data.table(xts::as.xts(nav_units))
         setnames(nav_units, c("timestamp", "price"))
       } else {
-        cf = transfers[, .(timestamp, NAV = as.numeric(NAV))]
-        cf[timestamp < start_date, timestamp := dt_[, min(timestamp)]]
-        cf = cf[, .(NAV = sum(NAV)), by = timestamp]
-        if (cf[1, timestamp] == dt_[1, timestamp]) {
-          cf[1, NAV := as.numeric(dt_[1, NAV])]
+        transfer_test = transfers[
+          timestamp %between% c(dt_[, min(timestamp)], dt_[, max(timestamp)])
+        ]
+        if (nrow(transfer_test) == 0) {
+          nav_units = scale1(as.xts.data.table(dt_), level = 100)
+          nav_units = as.data.table(xts::as.xts(nav_units))
+          setnames(nav_units, c("timestamp", "price"))
+        } else {
+          cf = transfers[timestamp <= end_date, .(timestamp, NAV = as.numeric(NAV))]
+          cf[timestamp < start_date, timestamp := dt_[, min(timestamp)]]
+          setorder(cf, timestamp)
+          cf = cf[, .(NAV = sum(NAV)), by = timestamp]
+          if (nrow(cf) > 0 && cf[1, timestamp] == dt_[1, timestamp]) {
+            cf[1, NAV := as.numeric(dt_[1, NAV])]
+          }
+          dt_[, timestamp_temp := timestamp]
+          cf = dt_[cf, on = "timestamp", roll = Inf]
+          cf = cf[, .(timestamp = timestamp_temp, NAV = i.NAV)]
+          dt_[, timestamp_temp := NULL]
+          nav_units = unit_prices(
+            as.data.frame(dt_),
+            cashflow = as.data.frame(cf),
+            initial.price = 100
+          )
+          nav_units = as.data.table(nav_units)
+          # nav_units[, plot(price)]
         }
-        nav_units = unit_prices(
-          as.data.frame(dt_),
-          cashflow = as.data.frame(cf),
-          initial.price = 100
-        )
-        nav_units = as.data.table(nav_units)
       }
+      return(nav_units)
     }
   )
 )
@@ -364,7 +374,7 @@ Strategy = R6::R6Class(
 # FLEX_RISKCOMBO = c(
 #   "https://snpmarketdata.blob.core.windows.net/flex/riskcombo.xml"
 # )
-# # PRA
+# PRA
 # pra_start = as.Date("2023-04-25")
 # strategy = Strategy$new(lapply(FLEX_PRA[[2]], read_xml), start_date = as.Date("2024-07-01"))
 # strategy = Strategy$new(lapply(FLEX_PRA, read_xml), start_date = pra_start)

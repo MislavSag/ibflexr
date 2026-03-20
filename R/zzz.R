@@ -6,6 +6,7 @@
 #' @import httr
 #' @import yahoofinancer
 #' @import qlcal
+#' @import quantmod
 #' @importFrom anytime anytime anydate
 #' @importFrom PMwR unit_prices scale1
 
