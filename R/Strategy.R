@@ -122,6 +122,81 @@ Strategy = R6::R6Class(
     },
 
     #' @description
+    #' Calculate dollar NAV
+    #'
+    #' @param start_date The start date
+    #' @param end_date The end date
+    #' @param unit The unit
+    #'
+    #' @return The dollar NAV
+    calculate_equity_curve = function(start_date = self$start_date,
+                                      end_date   = self$end_date,
+                                      unit = NULL) {
+
+      # --- Transfers ---
+      transfers = self$extract_node("Transfer", FALSE)
+      transfers = transfers[, .(date, cashTransfer)]
+      transfers = transfers[, .(cashTransfer = sum(cashTransfer)), by = date]
+      transfers = transfers[cashTransfer != 0]
+      setnames(transfers, c("timestamp", "NAV"))
+
+      # --- Raw Equity Curve (Gross) ---
+      equity_curve = self$extract_node("EquitySummaryByReportDateInBase", FALSE)
+      equity_curve = equity_curve[, .(timestamp = reportDate, NAV = total)]
+      equity_curve = equity_curve[NAV > 0]
+      equity_curve = unique(equity_curve, by = "timestamp", fromLast = TRUE)
+      setorder(equity_curve, "timestamp")
+
+      # Adjust for transfers
+      if (!is.null(transfers) & nrow(transfers) > 2) {
+        transfers[3:nrow(transfers), timestamp := as.Date(
+          vapply(timestamp, FUN = function(x) qlcal::advanceDate(x, -1L), FUN.VALUE = double(1L))
+        )]
+        equity_curve[timestamp %in% transfers[3:nrow(transfers), timestamp],
+                     NAV := NAV + transfers[3:nrow(transfers), NAV]]
+      }
+
+      # --- Net Equity Curve (after financing costs) ---
+      cfd_charges = self$extract_node("CFDCharge", FALSE)
+      interests   = self$extract_node("TierInterestDetail", FALSE)
+      interests = self$extract_node("TierInterestDetail", FALSE)
+      if (is.null(interests)) {
+        interests = data.table(valueDate = as.Date(character()), totalInterest = numeric())
+      } else {
+        interests = interests[, .(totalInterest = sum(totalInterest, na.rm = TRUE)), by = valueDate]
+      }
+
+      equity_curve_net = cfd_charges[equity_curve, on = c("date" = "timestamp")]
+      equity_curve_net = interests[equity_curve_net, on = c("valueDate" = "date")]
+      equity_curve_net[, cum_cfd_cost := cumsum(nafill(total, fill = 0))]
+      equity_curve_net[, cum_interests := cumsum(nafill(totalInterest, fill = 0))]
+      equity_curve_net[, NAV := NAV - cum_cfd_cost - cum_interests]
+      equity_curve_net = equity_curve_net[, .(timestamp = valueDate, NAV)]
+
+      # --- Dates ---
+      if (is.null(start_date)) start_date = equity_curve[, min(timestamp)]
+      if (is.null(end_date))   end_date   = equity_curve[, max(timestamp)]
+
+      equity_curve     = equity_curve[timestamp %between% c(start_date, end_date)]
+      equity_curve_net = equity_curve_net[timestamp %between% c(start_date, end_date)]
+
+      # --- Apply unit if provided ---
+      if (!is.null(unit)) {
+        equity_curve[, NAV := NAV * unit]
+        equity_curve_net[, NAV := NAV * unit]
+      }
+
+      # --- Merge gross and net curves ---
+      equity_curves = merge(
+        equity_curve[, .(date = timestamp, EquityCurve = NAV)],
+        equity_curve_net[, .(date = timestamp, EquityCurveNet = NAV)],
+        by = "date", all = TRUE
+      )
+
+      return(equity_curves)
+    },
+
+    #' @description
     #' Calculate NAV units
     #'
     #' @param benchmark_symbol The benchmark symbol
