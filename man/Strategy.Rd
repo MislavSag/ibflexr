@@ -29,6 +29,7 @@ The Strategy class is used to extract and clean data from the flex reports.
 \item \href{#method-Strategy-new}{\code{Strategy$new()}}
 \item \href{#method-Strategy-extract_node}{\code{Strategy$extract_node()}}
 \item \href{#method-Strategy-summary_cfd_trades}{\code{Strategy$summary_cfd_trades()}}
+\item \href{#method-Strategy-calculate_equity_curve}{\code{Strategy$calculate_equity_curve()}}
 \item \href{#method-Strategy-calculate_nav_units}{\code{Strategy$calculate_nav_units()}}
 \item \href{#method-Strategy-clone}{\code{Strategy$clone()}}
 }
@@ -91,6 +92,34 @@ Summarize CFD trades
 
 \subsection{Returns}{
 The summarized CFD trades
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Strategy-calculate_equity_curve"></a>}}
+\if{latex}{\out{\hypertarget{method-Strategy-calculate_equity_curve}{}}}
+\subsection{Method \code{calculate_equity_curve()}}{
+Calculate dollar NAV
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Strategy$calculate_equity_curve(
+  start_date = self$start_date,
+  end_date = self$end_date,
+  unit = NULL
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{start_date}}{The start date}
+
+\item{\code{end_date}}{The end date}
+
+\item{\code{unit}}{The unit}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+The dollar NAV
 }
 }
 \if{html}{\out{<hr>}}

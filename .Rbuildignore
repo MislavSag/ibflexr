@@ -1,2 +1,10 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
+^\.gitignore$
+^\.Renviron$
+^\.Rhistory$
+^\.RData$
+^\.Ruserdata$
+^\.vscode$
+^\.vscode/.*$
+^commits_.*\.txt$

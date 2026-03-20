@@ -293,10 +293,13 @@ Strategy = R6::R6Class(
 
       # Add benchmark
       if (!is.null(benchmark_symbol)) {
-        # benchmark_symbol = "SPY"
-        getSymbols("SPY")
-        benchmark  = as.data.table(SPY)
-        benchmark = benchmark[, .(date = index, adj_close = SPY.Adjusted)]
+        benchmark_xts = quantmod::getSymbols(benchmark_symbol, auto.assign = FALSE)
+        benchmark = as.data.table(benchmark_xts)
+        adjusted_col = grep("\\.Adjusted$", names(benchmark), value = TRUE)
+        if (length(adjusted_col) != 1) {
+          stop("Could not identify adjusted close column for benchmark: ", benchmark_symbol)
+        }
+        benchmark = benchmark[, .(date = index, adj_close = get(adjusted_col))]
         benchmark = na.omit(benchmark)
         nav_units = benchmark[nav_units, on = c("date" = "timestamp")]
         nav_units[, close_unit := adj_close / data.table::first(adj_close) * 100]
