@@ -403,11 +403,13 @@ Strategy = R6::R6Class(
           cf[timestamp < start_date, timestamp := dt_[, min(timestamp)]]
           setorder(cf, timestamp)
           cf = cf[, .(NAV = sum(NAV)), by = timestamp]
-          if (nrow(cf) > 0 && cf[1, timestamp] == dt_[1, timestamp]) {
+          if (nrow(cf) > 0 && cf[1, timestamp] == dt_[1, timestamp]) { # ????????????????
             cf[1, NAV := as.numeric(dt_[1, NAV])]
+            cf = cf[-1] 
           }
           dt_[, timestamp_temp := timestamp]
-          cf = dt_[cf, on = "timestamp", roll = Inf]
+          cf = dt_[cf, on = "timestamp"]
+          # cf = dt_[cf, on = "timestamp", roll = -Inf]
           cf = cf[, .(timestamp = timestamp_temp, NAV = i.NAV)]
           dt_[, timestamp_temp := NULL]
           nav_units = unit_prices(
@@ -452,6 +454,9 @@ Strategy = R6::R6Class(
 # FLEX_RISKCOMBO = c(
 #   "https://snpmarketdata.blob.core.windows.net/flex/riskcombo.xml"
 # )
+# FLEX_RISKCOMBO_QQQ = c(
+#   "https://snpmarketdata.blob.core.windows.net/flex/riskcombo.xml"
+# )
 # PRA
 # pra_start = as.Date("2023-04-25")
 # strategy = Strategy$new(lapply(FLEX_PRA[[2]], read_xml), start_date = as.Date("2024-07-01"))
@@ -477,6 +482,10 @@ Strategy = R6::R6Class(
 # strategy$extract_node("PriorPeriodPosition")[]
 # strategy$extract_node("OpenPosition")[]
 # strategy$summary_cfd_trades()[]
+# RISK COMBO QQQ
+# FLEX_RISKCOMBOQQQ = "https://snpmarketdata.blob.core.windows.net/flex/pra.xml"
+# strategy = Strategy$new(lapply(FLEX_RISKCOMBOQQQ, read_xml), start_date = as.Date("2025-10-21"))
+# self = strategy$clone()
 
 # flex_report_2023 = read_xml(FLEX_PRA[1])
 # flex_report_2024 = read_xml(FLEX_PRA[2])
