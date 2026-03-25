@@ -405,12 +405,13 @@ Strategy = R6::R6Class(
           cf = cf[, .(NAV = sum(NAV)), by = timestamp]
           if (nrow(cf) > 0 && cf[1, timestamp] == dt_[1, timestamp]) { # ????????????????
             cf[1, NAV := as.numeric(dt_[1, NAV])]
-            cf = cf[-1] 
+            # cf = cf[-1] 
           }
           dt_[, timestamp_temp := timestamp]
-          cf = dt_[cf, on = "timestamp"]
-          # cf = dt_[cf, on = "timestamp", roll = -Inf]
-          cf = cf[, .(timestamp = timestamp_temp, NAV = i.NAV)]
+          cf = dt_[cf, on = "timestamp", roll = -Inf]
+          cf = cf[!is.na(timestamp_temp)]
+          cf = cf[, .(NAV = sum(i.NAV)), by = timestamp_temp]
+          setnames(cf, "timestamp_temp", "timestamp")
           dt_[, timestamp_temp := NULL]
           nav_units = unit_prices(
             as.data.frame(dt_),
@@ -486,6 +487,7 @@ Strategy = R6::R6Class(
 # FLEX_RISKCOMBOQQQ = "https://snpmarketdata.blob.core.windows.net/flex/pra.xml"
 # strategy = Strategy$new(lapply(FLEX_RISKCOMBOQQQ, read_xml), start_date = as.Date("2025-10-21"))
 # self = strategy$clone()
+# strategy$calculate_nav_units("SPY")
 
 # flex_report_2023 = read_xml(FLEX_PRA[1])
 # flex_report_2024 = read_xml(FLEX_PRA[2])
