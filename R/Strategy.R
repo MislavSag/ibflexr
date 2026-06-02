@@ -270,7 +270,7 @@ Strategy = R6::R6Class(
       if (is.null(end_date)) {
         end_date = equity_curve[, max(timestamp)]
       }
-
+      
       # Filter by dates
       nav_units = private$get_unit_prices(
         equity_curve,
@@ -293,6 +293,9 @@ Strategy = R6::R6Class(
 
       # Add benchmark
       if (!is.null(benchmark_symbol)) {
+        # benchmark_symbol = "SPY"
+        # library(data.table)
+        # library(quantmod)
         benchmark_xts = quantmod::getSymbols(benchmark_symbol, auto.assign = FALSE)
         benchmark = as.data.table(benchmark_xts)
         adjusted_col = grep("\\.Adjusted$", names(benchmark), value = TRUE)
@@ -302,7 +305,13 @@ Strategy = R6::R6Class(
         benchmark = benchmark[, .(date = index, adj_close = get(adjusted_col))]
         benchmark = na.omit(benchmark)
         nav_units = benchmark[nav_units, on = c("date" = "timestamp")]
-        nav_units[, close_unit := adj_close / data.table::first(adj_close) * 100]
+        # Normalise by the first *available* benchmark close. The strategy series can
+        # begin on a date with no benchmark price (e.g. a market holiday pulled in by
+        # the start_date lookback), in which case data.table::first() would be NA and
+        # turn every close_unit into NA. Rows still missing a benchmark price are
+        # dropped later by na.omit() on the required columns.
+        base_adj_close = nav_units$adj_close[which(!is.na(nav_units$adj_close))[1]]
+        nav_units[, close_unit := adj_close / base_adj_close * 100]
 
         # # benchmark_symbol = "SPY"
         # url = "https://financialmodelingprep.com/stable/historical-price-eod/dividend-adjusted"
@@ -336,13 +345,99 @@ Strategy = R6::R6Class(
         # nav_units[, close_unit := (adj_close / data.table::first(adj_close)) * 100]
       }
 
-      # Set names as Strategy and Benchmark
-      nav_units_merged = merge(nav_units[, .(date, Strategy = price, Benchmark = close_unit)],
-                               nav_units_gross[, .(date = timestamp, StrategyGross = price)],
-                               by = "date", all = TRUE)
-      nav_units_merged = na.omit(nav_units_merged, cols = c("Strategy", "Benchmark"))
-      nav_units_merged = unique(nav_units_merged, by = c("date", "Strategy", "Benchmark"))
+      if ("date" %in% names(nav_units)) {
+        strategy_units = nav_units[, .(date, Strategy = price)]
+      } else {
+        strategy_units = nav_units[, .(date = timestamp, Strategy = price)]
+      }
+      if ("close_unit" %in% names(nav_units)) {
+        strategy_units[, Benchmark := nav_units$close_unit]
+      }
+
+      nav_units_merged = merge(
+        strategy_units,
+        nav_units_gross[, .(date = timestamp, StrategyGross = price)],
+        by = "date", all = TRUE
+      )
+
+      required_cols = "Strategy"
+      if ("Benchmark" %in% names(nav_units_merged)) {
+        required_cols = c(required_cols, "Benchmark")
+      }
+
+      nav_units_merged = na.omit(nav_units_merged, cols = required_cols)
+      nav_units_merged = unique(nav_units_merged, by = intersect(c("date", "Strategy", "Benchmark"), names(nav_units_merged)))
       return(nav_units_merged)
+    },
+
+    #' @description
+    #' Plot NAV units with the date on the x-axis.
+    #'
+    #' @param benchmark_symbol The benchmark symbol
+    #' @param start_date The start date
+    #' @param end_date The end date
+    #' @param unit The unit
+    #' @param include_benchmark Include the benchmark in the plot
+    #' @param include_gross Include the gross strategy line in the plot
+    #' @param ... Additional plotting arguments passed to graphics::plot
+    #'
+    #' @return Invisibly returns the plotted NAV units data.table
+    plot_nav_units = function(benchmark_symbol = NULL,
+                              start_date = self$start_date,
+                              end_date = self$end_date,
+                              unit = NULL,
+                              include_benchmark = !is.null(benchmark_symbol),
+                              include_gross = FALSE,
+                              ...) {
+      nav_units = self$calculate_nav_units(
+        benchmark_symbol = benchmark_symbol,
+        start_date = start_date,
+        end_date = end_date,
+        unit = unit
+      )
+
+      if (nrow(nav_units) == 0) {
+        stop("No NAV units available for the selected date range.")
+      }
+
+      graphics::plot(
+        nav_units$date,
+        nav_units$Strategy,
+        type = "l",
+        xlab = "Date",
+        ylab = "NAV units",
+        ...
+      )
+
+      legend_labels = "Strategy"
+      legend_cols = "black"
+      legend_lty = 1L
+
+      if (include_benchmark && "Benchmark" %in% names(nav_units)) {
+        graphics::lines(nav_units$date, nav_units$Benchmark, col = "grey40", lty = 2L)
+        legend_labels = c(legend_labels, "Benchmark")
+        legend_cols = c(legend_cols, "grey40")
+        legend_lty = c(legend_lty, 2L)
+      }
+
+      if (include_gross && "StrategyGross" %in% names(nav_units)) {
+        graphics::lines(nav_units$date, nav_units$StrategyGross, col = "steelblue3", lty = 3L)
+        legend_labels = c(legend_labels, "StrategyGross")
+        legend_cols = c(legend_cols, "steelblue3")
+        legend_lty = c(legend_lty, 3L)
+      }
+
+      if (length(legend_labels) > 1L) {
+        graphics::legend(
+          "topleft",
+          legend = legend_labels,
+          col = legend_cols,
+          lty = legend_lty,
+          bty = "n"
+        )
+      }
+
+      invisible(nav_units)
     }
   ),
   private = list(
@@ -380,7 +475,7 @@ Strategy = R6::R6Class(
       return(dt)
     },
     get_unit_prices = function(equity_curve, transfers, start_date, end_date) {
-      dt_ = equity_curve[timestamp %between% c(start_date, end_date)]
+      dt_ = equity_curve[timestamp %between% c(start_date-10, end_date)]
       if (nrow(dt_) == 0) {
         return(data.table(timestamp = as.Date(character()), price = numeric()))
       }
@@ -403,9 +498,20 @@ Strategy = R6::R6Class(
           cf[timestamp < start_date, timestamp := dt_[, min(timestamp)]]
           setorder(cf, timestamp)
           cf = cf[, .(NAV = sum(NAV)), by = timestamp]
-          if (nrow(cf) > 0 && cf[1, timestamp] == dt_[1, timestamp]) { # ????????????????
+          # Ensure an inception "seed" cashflow at the first equity date equal to the
+          # initial NAV. When a transfer already lands on the first date we overwrite
+          # its amount (previous behaviour); otherwise we prepend the seed row.
+          # Without a seed, a first transfer that occurs mid-series (e.g. a later
+          # capital deposit, as in LowRisk) leaves zero units before it and
+          # unit_prices() returns Inf for the whole pre-transfer period.
+          if (nrow(cf) == 0 || cf[1, timestamp] != dt_[1, timestamp]) {
+            cf = rbind(
+              data.table(timestamp = dt_[1, timestamp], NAV = as.numeric(dt_[1, NAV])),
+              cf
+            )
+            setorder(cf, timestamp)
+          } else {
             cf[1, NAV := as.numeric(dt_[1, NAV])]
-            # cf = cf[-1] 
           }
           dt_[, timestamp_temp := timestamp]
           cf = dt_[cf, on = "timestamp", roll = -Inf]
@@ -488,6 +594,13 @@ Strategy = R6::R6Class(
 # strategy = Strategy$new(lapply(FLEX_RISKCOMBOQQQ, read_xml), start_date = as.Date("2025-10-21"))
 # self = strategy$clone()
 # strategy$calculate_nav_units("SPY")
+# plot(strategy$calculate_nav_units("SPY")$Strategy)
+# strategy$plot_nav_units("SPY")
+# strategy = Strategy$new(lapply(FLEX_RISKCOMBOQQQ, read_xml), start_date = as.Date("2025-10-22"))
+# LEAST VOLATILE
+# FLEX_LOWRISK = "https://snpmarketdata.blob.core.windows.net/flex/lowrisk.xml"
+# strategy = Strategy$new(lapply(FLEX_LOWRISK, read_xml), start_date = as.Date("2026-01-27"))
+# self = strategy$clone()
 
 # flex_report_2023 = read_xml(FLEX_PRA[1])
 # flex_report_2024 = read_xml(FLEX_PRA[2])
