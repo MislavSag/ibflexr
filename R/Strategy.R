@@ -475,7 +475,7 @@ Strategy = R6::R6Class(
       return(dt)
     },
     get_unit_prices = function(equity_curve, transfers, start_date, end_date) {
-      dt_ = equity_curve[timestamp %between% c(start_date-10, end_date)]
+      dt_ = equity_curve[timestamp %between% c(start_date, end_date)]
       if (nrow(dt_) == 0) {
         return(data.table(timestamp = as.Date(character()), price = numeric()))
       }
