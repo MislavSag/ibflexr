@@ -304,6 +304,30 @@ Strategy = R6::R6Class(
         }
         benchmark = benchmark[, .(date = index, adj_close = get(adjusted_col))]
         benchmark = na.omit(benchmark)
+
+        # Yahoo frequently lags the *adjusted* close for the most recent trading
+        # day(s), returning NA. Those strategy dates would then be dropped by the
+        # final na.omit() below, making the dashboard appear a day behind. Backfill
+        # any strategy dates missing from the Yahoo benchmark using Financial
+        # Modeling Prep's dividend-adjusted EOD prices (same scale as the Yahoo
+        # adjusted close, so the series stays continuous).
+        needed_dates = unique(as.Date(nav_units$timestamp))
+        missing_dates = needed_dates[!needed_dates %in% benchmark$date]
+        if (length(missing_dates) > 0) {
+          fmp_fill = private$fetch_benchmark_fmp(
+            benchmark_symbol,
+            from = min(missing_dates) - 7,
+            to   = max(missing_dates)
+          )
+          if (!is.null(fmp_fill) && nrow(fmp_fill) > 0) {
+            fmp_fill = fmp_fill[date %in% missing_dates & !is.na(adj_close)]
+            if (nrow(fmp_fill) > 0) {
+              benchmark = unique(rbind(benchmark, fmp_fill[, .(date, adj_close)]), by = "date")
+              setorder(benchmark, date)
+            }
+          }
+        }
+
         nav_units = benchmark[nav_units, on = c("date" = "timestamp")]
         # Normalise by the first *available* benchmark close. The strategy series can
         # begin on a date with no benchmark price (e.g. a market holiday pulled in by
@@ -441,6 +465,43 @@ Strategy = R6::R6Class(
     }
   ),
   private = list(
+    # Fetch dividend-adjusted EOD benchmark prices from Financial Modeling Prep.
+    # Used as a fallback when Yahoo (quantmod::getSymbols) has not yet published
+    # the adjusted close for the most recent trading day(s). Returns a data.table
+    # with columns `date` (Date) and `adj_close` (numeric), or NULL on any failure
+    # so the caller can degrade gracefully. The APIKEY env var holds the FMP key.
+    fetch_benchmark_fmp = function(symbol, from, to) {
+      apikey = Sys.getenv("APIKEY")
+      if (!nzchar(apikey)) {
+        return(NULL)
+      }
+      resp = tryCatch(
+        httr::GET(
+          "https://financialmodelingprep.com/stable/historical-price-eod/dividend-adjusted",
+          query = list(
+            symbol = symbol,
+            from   = as.character(from),
+            to     = as.character(to),
+            apikey = apikey
+          ),
+          httr::timeout(15)
+        ),
+        error = function(e) NULL
+      )
+      if (is.null(resp) || httr::http_error(resp)) {
+        return(NULL)
+      }
+      res = tryCatch(httr::content(resp, as = "parsed"), error = function(e) NULL)
+      if (is.null(res) || length(res) == 0) {
+        return(NULL)
+      }
+      res = rbindlist(lapply(res, function(x) as.data.table(x)), fill = TRUE)
+      if (nrow(res) == 0 || !all(c("date", "adjClose") %in% names(res))) {
+        return(NULL)
+      }
+      res = res[, .(date = as.Date(date), adj_close = as.numeric(adjClose))]
+      na.omit(res)
+    },
     filter_date = function(dt, date_) {
       # dt = copy(xml_extracted)
       # date = "reportDate"
